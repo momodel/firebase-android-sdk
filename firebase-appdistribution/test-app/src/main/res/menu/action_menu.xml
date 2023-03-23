@@ -3,4 +3,7 @@
     <item android:id="@+id/startFeedbackMenuItem"
         android:title="@string/startFeedbackLabel"
         android:visible="false"/>
+    <item android:id="@+id/startFeedbackWithUriMenuItem"
+        android:title= "@string/startFeedbackWithUriLabel"
+        android:visible="false"/>
 </menu>

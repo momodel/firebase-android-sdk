@@ -15,6 +15,7 @@
 package com.googletest.firebase.appdistribution.testapp
 
 import android.Manifest.permission.POST_NOTIFICATIONS
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,6 +30,8 @@ import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -67,6 +70,38 @@ class MainActivity : AppCompatActivity() {
   lateinit var progressBar: ProgressBar
   lateinit var feedbackTriggerMenu: TextInputLayout
   lateinit var permissionRequestLauncher: ActivityResultLauncher<String>
+
+
+  private val chooseScreenshotLauncher: ActivityResultLauncher<Intent> =
+    registerForActivityResult<Intent, ActivityResult>(
+      ActivityResultContracts.StartActivityForResult(),
+      ActivityResultCallback { activityResult: ActivityResult? ->
+        this.handleChooseScreenshotResult(
+          activityResult
+        )
+      })
+
+
+  private fun handleChooseScreenshotResult(activityResult: ActivityResult?) {
+    if (activityResult == null) {
+      return
+    }
+    val resultCode = activityResult.resultCode
+    val intent = activityResult.data
+    if (resultCode == Activity.RESULT_OK && intent != null && intent.data != null) {
+      val uri = intent.data
+      Log.w(
+        "LKELLOGG",
+        "Selected custom screenshot URI: $uri"
+      )
+      firebaseAppDistribution.startFeedback(R.string.feedbackAdditionalFormText, uri)
+    } else {
+      Log.w(
+        "LKELLOGG",
+        "No custom screenshot selected. Not starting feedback."
+      )
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -183,6 +218,7 @@ class MainActivity : AppCompatActivity() {
     inflater.inflate(R.menu.action_menu, menu)
     if (BuildConfig.FLAVOR == "beta") {
       menu.findItem(R.id.startFeedbackMenuItem).isVisible = true
+      menu.findItem(R.id.startFeedbackWithUriMenuItem).isVisible = true
     }
     return true
   }
@@ -191,6 +227,14 @@ class MainActivity : AppCompatActivity() {
     return when (item.itemId) {
       R.id.startFeedbackMenuItem -> {
         Firebase.appDistribution.startFeedback(R.string.feedbackAdditionalFormText)
+        true
+      }
+      R.id.startFeedbackWithUriMenuItem -> {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+        intent.addCategory(Intent.CATEGORY_OPENABLE)
+        intent.type = "*/*"
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/png", "image/jpeg"))
+        chooseScreenshotLauncher.launch(intent)
         true
       }
       else -> super.onOptionsItemSelected(item)
