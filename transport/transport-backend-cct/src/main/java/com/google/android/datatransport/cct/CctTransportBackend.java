@@ -133,6 +133,15 @@ final class CctTransportBackend implements TransportBackend {
     return (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
   }
 
+  // Returns the MCC_MNC value, or empty string if missing.
+  private static String getMccMnc(Context context) {
+    String mccMnc = getTelephonyManager(context).getSimOperator();
+    if (mccMnc == null) {
+      return "";
+    }
+    return mccMnc;
+  }
+
   private static int getPackageVersionCode(Context context) {
     try {
       int packageVersionCode =
@@ -165,7 +174,7 @@ final class CctTransportBackend implements TransportBackend {
         .addMetadata(KEY_MOBILE_SUBTYPE, getNetSubtypeValue(networkInfo))
         .addMetadata(KEY_COUNTRY, Locale.getDefault().getCountry())
         .addMetadata(KEY_LOCALE, Locale.getDefault().getLanguage())
-        .addMetadata(KEY_MCC_MNC, getTelephonyManager(applicationContext).getSimOperator())
+        .addMetadata(KEY_MCC_MNC, getMccMnc(applicationContext))
         .addMetadata(
             KEY_APPLICATION_BUILD, Integer.toString(getPackageVersionCode(applicationContext)))
         .build();
