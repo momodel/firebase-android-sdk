@@ -48,8 +48,9 @@ abstract class ApiDiffer : DefaultTask() {
     val (pMajor, pMinor, _) = previousVersionString.get().split(".")
     val (major, minor, _) = version.get().split(".")
     val curVersionDelta: VersionDelta =
-      if (major > pMajor) VersionDelta.MAJOR
-      else if (minor > pMinor) VersionDelta.MINOR else VersionDelta.PATCH
+      if (major.toIntOrNull()!! > pMajor.toIntOrNull()!!) VersionDelta.MAJOR
+      else if (minor.toIntOrNull()!! > pMinor.toIntOrNull()!!) VersionDelta.MINOR
+      else VersionDelta.PATCH
     val afterJar = readApi(currentJar.get())
     val beforeJar = readApi(previousJar.get())
     val classKeys = afterJar.keys union beforeJar.keys
@@ -60,9 +61,11 @@ abstract class ApiDiffer : DefaultTask() {
           DeltaType.values().flatMap { it.getViolations(before, after) }
         }
     val deltaViolations: List<Delta> =
-      if (curVersionDelta == VersionDelta.MINOR)
-        apiDeltas.filter { it.versionDelta == VersionDelta.MAJOR }
-      else if (curVersionDelta == VersionDelta.PATCH) apiDeltas else mutableListOf()
+      when (curVersionDelta) {
+        VersionDelta.MINOR -> apiDeltas.filter { it.versionDelta == VersionDelta.MAJOR }
+        VersionDelta.PATCH -> apiDeltas
+        else -> mutableListOf()
+      }
     if (!apiDeltas.isEmpty()) {
       val printString =
         apiDeltas.joinToString(
@@ -74,6 +77,7 @@ abstract class ApiDiffer : DefaultTask() {
         }
       println(printString)
     }
+    print(deltaViolations)
     if (!deltaViolations.isEmpty()) {
       val outputString =
         deltaViolations.joinToString(
