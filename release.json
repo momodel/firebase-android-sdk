@@ -1,0 +1,6 @@
+{
+    "name": "m146_1",
+    "libraries": [
+        ":firebase-vertexai",
+    ]
+}
