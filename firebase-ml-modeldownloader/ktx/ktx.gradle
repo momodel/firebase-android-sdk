@@ -62,9 +62,3 @@ dependencies {
     testImplementation "org.robolectric:robolectric:$robolectricVersion"
 }
 
-// ==========================================================================
-// Copy from here down if you want to use the google-services plugin in your
-// androidTest integration tests.
-// ==========================================================================
-ext.packageName = "com.google.firebase.ml.modeldownloader.ktx"
-apply from: '../../gradle/googleServices.gradle'
