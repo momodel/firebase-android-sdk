@@ -39,6 +39,11 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
         test.java.srcDirs += 'src/test/kotlin'
     }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    kotlinOptions { jvmTarget = "1.8" }
     testOptions.unitTests.includeAndroidResources = true
 }
 
@@ -56,3 +61,10 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:3.6.0'
     testImplementation "org.robolectric:robolectric:$robolectricVersion"
 }
+
+// ==========================================================================
+// Copy from here down if you want to use the google-services plugin in your
+// androidTest integration tests.
+// ==========================================================================
+ext.packageName = "com.google.firebase.ml.modeldownloader.ktx"
+apply from: '../../gradle/googleServices.gradle'
