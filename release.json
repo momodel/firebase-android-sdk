@@ -1,0 +1,6 @@
+{
+    "name": "dataconnect-release",
+    "libraries": [
+        ":firebase-dataconnect"
+    ]
+}
