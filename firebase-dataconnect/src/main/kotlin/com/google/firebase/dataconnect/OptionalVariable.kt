@@ -22,7 +22,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-@Serializable(with = OptionalVariableSerializer::class)
+@Serializable(with = OptionalVariable.Serializer::class)
 public sealed interface OptionalVariable<out T> {
 
   public fun valueOrNull(): T?
@@ -46,22 +46,22 @@ public sealed interface OptionalVariable<out T> {
     override fun equals(other: Any?): Boolean = other is Value<*> && value == other.value
     override fun toString(): String = value.toString()
   }
-}
 
-public class OptionalVariableSerializer<T>(private val elementSerializer: KSerializer<T>) :
-  KSerializer<OptionalVariable<T>> {
+  public class Serializer<T>(private val elementSerializer: KSerializer<T>) :
+    KSerializer<OptionalVariable<T>> {
 
-  override val descriptor: SerialDescriptor = elementSerializer.descriptor
+    override val descriptor: SerialDescriptor = elementSerializer.descriptor
 
-  override fun deserialize(decoder: Decoder): OptionalVariable<T> =
-    throw UnsupportedOperationException("OptionalVariableSerializer does not support decoding")
+    override fun deserialize(decoder: Decoder): OptionalVariable<T> =
+      throw UnsupportedOperationException("OptionalVariable.Serializer does not support decoding")
 
-  override fun serialize(encoder: Encoder, value: OptionalVariable<T>) {
-    when (value) {
-      is OptionalVariable.Undefined -> {
-        /* nothing to do */
+    override fun serialize(encoder: Encoder, value: OptionalVariable<T>) {
+      when (value) {
+        is Undefined -> {
+          /* nothing to do; undefined variables are omitted altogether */
+        }
+        is Value<T> -> elementSerializer.serialize(encoder, value.value)
       }
-      is OptionalVariable.Value<T> -> elementSerializer.serialize(encoder, value.value)
     }
   }
 }
