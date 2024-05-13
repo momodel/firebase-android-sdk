@@ -18,18 +18,54 @@ type Foo @table {
 }
 
 type StringVariants @table {
-  id: String!
   nonNullWithNonEmptyValue: String!
   nonNullWithEmptyValue: String!
   nullableWithNullValue: String
   nullableWithNonNullValue: String
   nullableWithEmptyValue: String
-  emptyList: [String!]
-  nonEmptyList: [String!]
+}
+
+type IntVariants @table {
+  nonNullWithZeroValue: Int!
+  nonNullWithPositiveValue: Int!
+  nonNullWithNegativeValue: Int!
+  nonNullWithMaxValue: Int!
+  nonNullWithMinValue: Int!
+  nullableWithNullValue: Int
+  nullableWithZeroValue: Int
+  nullableWithPositiveValue: Int
+  nullableWithNegativeValue: Int
+  nullableWithMaxValue: Int
+  nullableWithMinValue: Int
+}
+
+type FloatVariants @table {
+  nonNullWithZeroValue: Float!
+  nonNullWithNegativeZeroValue: Float!
+  nonNullWithPositiveValue: Float!
+  nonNullWithNegativeValue: Float!
+  nonNullWithMaxValue: Float!
+  nonNullWithMinValue: Float!
+  nonNullWithMaxSafeIntegerValue: Float!
+  nullableWithNullValue: Float
+  nullableWithZeroValue: Float
+  nullableWithNegativeZeroValue: Float
+  nullableWithPositiveValue: Float
+  nullableWithNegativeValue: Float
+  nullableWithMaxValue: Float
+  nullableWithMinValue: Float
+  nullableWithMaxSafeIntegerValue: Float
+}
+
+type BooleanVariants @table {
+  nonNullWithTrueValue: Boolean!
+  nonNullWithFalseValue: Boolean!
+  nullableWithNullValue: Boolean
+  nullableWithTrueValue: Boolean
+  nullableWithFalseValue: Boolean
 }
 
 type Int64Variants @table {
-  id: String!
   nonNullWithZeroValue: Int64!
   nonNullWithPositiveValue: Int64!
   nonNullWithNegativeValue: Int64!
@@ -41,40 +77,29 @@ type Int64Variants @table {
   nullableWithNegativeValue: Int64
   nullableWithMaxValue: Int64
   nullableWithMinValue: Int64
-  emptyList: [Int64!]
-  nonEmptyList: [Int64!]
 }
 
 type UUIDVariants @table {
-  id: String!
   nonNullValue: UUID!
   nullableWithNullValue: UUID
   nullableWithNonNullValue: UUID
-  emptyList: [UUID!]
-  nonEmptyList: [UUID!]
 }
 
 type DateVariants @table {
-  id: String!
   nonNullValue: Date!
   nullableWithNullValue: Date
   nullableWithNonNullValue: Date
   minValue: Date
   maxValue: Date
   nonZeroTime: Date
-  emptyList: [Date!]
-  nonEmptyList: [Date!]
 }
 
 type TimestampVariants @table {
-  id: String!
   nonNullValue: Timestamp!
   nullableWithNullValue: Timestamp
   nullableWithNonNullValue: Timestamp
   minValue: Timestamp
   maxValue: Timestamp
-  emptyList: [Timestamp!]
-  nonEmptyList: [Timestamp!]
 }
 
 type SyntheticId @table {
@@ -222,4 +247,26 @@ type OptionalStrings @table {
   nullable2: String
   nullable3: String
   nullableWithSchemaDefault: String @default(value: "pb429m")
+}
+
+type NonNullableLists @table {
+  strings: [String!]!
+  ints: [Int!]!
+  floats: [Float!]!
+  booleans: [Boolean!]!
+  uuids: [UUID!]!
+  int64s: [Int64!]!
+  dates: [Date!]!
+  timestamps: [Timestamp!]!
+}
+
+type NullableLists @table {
+  strings: [String!]
+  ints: [Int!]
+  floats: [Float!]
+  booleans: [Boolean!]
+  uuids: [UUID!]
+  int64s: [Int64!]
+  dates: [Date!]
+  timestamps: [Timestamp!]
 }

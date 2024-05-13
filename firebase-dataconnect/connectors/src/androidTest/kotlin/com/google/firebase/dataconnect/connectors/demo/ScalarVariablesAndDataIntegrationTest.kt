@@ -18,78 +18,208 @@ package com.google.firebase.dataconnect.connectors.demo
 
 import com.google.common.truth.Truth.assertThat
 import com.google.firebase.Timestamp
-import com.google.firebase.dataconnect.*
-import com.google.firebase.dataconnect.connectors.demo.testutil.*
-import com.google.firebase.dataconnect.testutil.*
+import com.google.firebase.dataconnect.QueryRef
+import com.google.firebase.dataconnect.connectors.demo.testutil.DemoConnectorIntegrationTestBase
+import com.google.firebase.dataconnect.testutil.MAX_DATE
+import com.google.firebase.dataconnect.testutil.MAX_SAFE_INTEGER
+import com.google.firebase.dataconnect.testutil.MAX_VALUE
+import com.google.firebase.dataconnect.testutil.MIN_DATE
+import com.google.firebase.dataconnect.testutil.MIN_VALUE
+import com.google.firebase.dataconnect.testutil.toDate
 import java.util.Calendar
 import java.util.Date
 import java.util.UUID
 import kotlin.reflect.full.memberProperties
-import kotlinx.coroutines.test.*
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 
 class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase() {
 
   @Test
   fun stringVariants() = runTest {
-    val id = randomAlphanumericString()
+    val key =
+      connector.insertStringVariants
+        .execute(
+          nonNullWithNonEmptyValue = "some non-empty value for a *non*-nullable field",
+          nonNullWithEmptyValue = "",
+        ) {
+          nullableWithNullValue = null
+          nullableWithNonNullValue = "some non-empty value for a *nullable* field"
+          nullableWithEmptyValue = ""
+        }
+        .data
+        .key
 
-    connector.insertStringVariants.execute(
-      id = id,
-      nonNullWithNonEmptyValue = "some non-empty value for a *non*-nullable field",
-      nonNullWithEmptyValue = "",
-      emptyList = emptyList(),
-      nonEmptyList = listOf("foo", "", "BAR")
-    ) {
-      nullableWithNullValue = null
-      nullableWithNonNullValue = "some non-empty value for a *nullable* field"
-      nullableWithEmptyValue = ""
-    }
-
-    val queryResult = connector.getStringVariantsById.execute(id)
+    val queryResult = connector.getStringVariantsByKey.execute(key)
     assertThat(queryResult.data.stringVariants)
       .isEqualTo(
-        GetStringVariantsByIdQuery.Data.StringVariants(
+        GetStringVariantsByKeyQuery.Data.StringVariants(
           nonNullWithNonEmptyValue = "some non-empty value for a *non*-nullable field",
           nonNullWithEmptyValue = "",
           nullableWithNullValue = null,
           nullableWithNonNullValue = "some non-empty value for a *nullable* field",
           nullableWithEmptyValue = "",
-          emptyList = emptyList(),
-          nonEmptyList = listOf("foo", "", "BAR")
+        )
+      )
+  }
+
+  @Test
+  fun intVariants() = runTest {
+    val key =
+      connector.insertIntVariants
+        .execute(
+          nonNullWithZeroValue = 0,
+          nonNullWithPositiveValue = 42424242,
+          nonNullWithNegativeValue = -42424242,
+          nonNullWithMaxValue = Int.MAX_VALUE,
+          nonNullWithMinValue = Int.MIN_VALUE,
+        ) {
+          nullableWithNullValue = null
+          nullableWithZeroValue = 0
+          nullableWithPositiveValue = 24242424
+          nullableWithNegativeValue = -24242424
+          nullableWithMaxValue = Int.MAX_VALUE
+          nullableWithMinValue = Int.MIN_VALUE
+        }
+        .data
+        .key
+
+    val queryResult = connector.getIntVariantsByKey.execute(key)
+    assertThat(queryResult.data.intVariants)
+      .isEqualTo(
+        GetIntVariantsByKeyQuery.Data.IntVariants(
+          nonNullWithZeroValue = 0,
+          nonNullWithPositiveValue = 42424242,
+          nonNullWithNegativeValue = -42424242,
+          nonNullWithMaxValue = Int.MAX_VALUE,
+          nonNullWithMinValue = Int.MIN_VALUE,
+          nullableWithNullValue = null,
+          nullableWithZeroValue = 0,
+          nullableWithPositiveValue = 24242424,
+          nullableWithNegativeValue = -24242424,
+          nullableWithMaxValue = Int.MAX_VALUE,
+          nullableWithMinValue = Int.MIN_VALUE,
+        )
+      )
+  }
+
+  @Ignore(
+    "b/339440054 Fix this test once -0.0 is correctly sent from the backend " +
+      "instead of being converted to 0.0"
+  )
+  @Test
+  fun floatCorrectlySerializesNegativeZero() {
+    TODO(
+      "this test is merely a placeholder as a reminder " +
+        "and should be removed once the test is updated"
+    )
+  }
+
+  @Test
+  fun floatVariants() = runTest {
+    val key =
+      connector.insertFloatVariants
+        .execute(
+          nonNullWithZeroValue = 0.0,
+          nonNullWithNegativeZeroValue = 0.0, // TODO(b/339440054) change to -0.0
+          nonNullWithPositiveValue = 123.456,
+          nonNullWithNegativeValue = -987.654,
+          nonNullWithMaxValue = Double.MAX_VALUE,
+          nonNullWithMinValue = Double.MIN_VALUE,
+          nonNullWithMaxSafeIntegerValue = MAX_SAFE_INTEGER,
+        ) {
+          nullableWithNullValue = null
+          nullableWithZeroValue = 0.0
+          nullableWithNegativeZeroValue = 0.0 // TODO(b/339440054) change to -0.0
+          nullableWithPositiveValue = 789.012
+          nullableWithNegativeValue = -321.098
+          nullableWithMaxValue = Double.MAX_VALUE
+          nullableWithMinValue = Double.MIN_VALUE
+          nullableWithMaxSafeIntegerValue = MAX_SAFE_INTEGER
+        }
+        .data
+        .key
+
+    val queryResult = connector.getFloatVariantsByKey.execute(key)
+    assertThat(queryResult.data.floatVariants)
+      .isEqualTo(
+        GetFloatVariantsByKeyQuery.Data.FloatVariants(
+          nonNullWithZeroValue = 0.0,
+          nonNullWithNegativeZeroValue = 0.0, // TODO(b/339440054) change to -0.0
+          nonNullWithPositiveValue = 123.456,
+          nonNullWithNegativeValue = -987.654,
+          nonNullWithMaxValue = Double.MAX_VALUE,
+          nonNullWithMinValue = Double.MIN_VALUE,
+          nonNullWithMaxSafeIntegerValue = MAX_SAFE_INTEGER,
+          nullableWithNullValue = null,
+          nullableWithZeroValue = 0.0,
+          nullableWithNegativeZeroValue = 0.0, // TODO(b/339440054) change to -0.0
+          nullableWithPositiveValue = 789.012,
+          nullableWithNegativeValue = -321.098,
+          nullableWithMaxValue = Double.MAX_VALUE,
+          nullableWithMinValue = Double.MIN_VALUE,
+          nullableWithMaxSafeIntegerValue = MAX_SAFE_INTEGER,
+        )
+      )
+  }
+
+  @Test
+  fun booleanVariants() = runTest {
+    val key =
+      connector.insertBooleanVariants
+        .execute(
+          nonNullWithTrueValue = true,
+          nonNullWithFalseValue = false,
+        ) {
+          nullableWithNullValue = null
+          nullableWithTrueValue = true
+          nullableWithFalseValue = false
+        }
+        .data
+        .key
+
+    val queryResult = connector.getBooleanVariantsByKey.execute(key)
+    assertThat(queryResult.data.booleanVariants)
+      .isEqualTo(
+        GetBooleanVariantsByKeyQuery.Data.BooleanVariants(
+          nonNullWithTrueValue = true,
+          nonNullWithFalseValue = false,
+          nullableWithNullValue = null,
+          nullableWithTrueValue = true,
+          nullableWithFalseValue = false,
         )
       )
   }
 
   @Test
   fun int64Variants() = runTest {
-    val id = randomAlphanumericString()
+    val key =
+      connector.insertInt64variants
+        .execute(
+          nonNullWithZeroValue = 0,
+          nonNullWithPositiveValue = 4242424242424242,
+          nonNullWithNegativeValue = -4242424242424242,
+          nonNullWithMaxValue = Long.MAX_VALUE,
+          nonNullWithMinValue = Long.MIN_VALUE,
+        ) {
+          nullableWithNullValue = null
+          nullableWithZeroValue = 0
+          nullableWithPositiveValue = 2424242424242424
+          nullableWithNegativeValue = -2424242424242424
+          nullableWithMaxValue = Long.MAX_VALUE
+          nullableWithMinValue = Long.MIN_VALUE
+        }
+        .data
+        .key
 
-    connector.insertInt64variants.execute(
-      id = id,
-      nonNullWithZeroValue = 0,
-      nonNullWithPositiveValue = 4242424242424242,
-      nonNullWithNegativeValue = -4242424242424242,
-      nonNullWithMaxValue = Long.MAX_VALUE,
-      nonNullWithMinValue = Long.MIN_VALUE,
-      emptyList = emptyList(),
-      nonEmptyList = listOf(0, -1, 1, 99, -99, Long.MIN_VALUE, Long.MAX_VALUE)
-    ) {
-      nullableWithNullValue = null
-      nullableWithZeroValue = 0
-      nullableWithPositiveValue = 2424242424242424
-      nullableWithNegativeValue = -2424242424242424
-      nullableWithMaxValue = Long.MAX_VALUE
-      nullableWithMinValue = Long.MIN_VALUE
-    }
-
-    val queryResult = connector.getInt64variantsById.execute(id)
+    val queryResult = connector.getInt64variantsByKey.execute(key)
     assertThat(queryResult.data.int64Variants)
       .isEqualTo(
-        GetInt64variantsByIdQuery.Data.Int64variants(
+        GetInt64variantsByKeyQuery.Data.Int64variants(
           nonNullWithZeroValue = 0,
           nonNullWithPositiveValue = 4242424242424242,
           nonNullWithNegativeValue = -4242424242424242,
@@ -101,95 +231,84 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
           nullableWithNegativeValue = -2424242424242424,
           nullableWithMaxValue = Long.MAX_VALUE,
           nullableWithMinValue = Long.MIN_VALUE,
-          emptyList = emptyList(),
-          nonEmptyList = listOf(0, -1, 1, 99, -99, Long.MIN_VALUE, Long.MAX_VALUE)
         )
       )
   }
 
   @Test
   fun uuidVariants() = runTest {
-    val id = randomAlphanumericString()
-    val nonNullValue = UUID.randomUUID()
-    val nullableWithNullValue = UUID.randomUUID()
-    val nonEmptyList = listOf(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())
+    val key =
+      connector.insertUuidvariants
+        .execute(
+          nonNullValue = UUID.fromString("9ceda52f-18a1-431b-b9f7-89b674ca4bee"),
+        ) {
+          nullableWithNullValue = null
+          nullableWithNonNullValue = UUID.fromString("7ca7c62a-c551-4cb9-8f86-0a2ce3d68b72")
+        }
+        .data
+        .key
 
-    connector.insertUuidvariants.execute(
-      id = id,
-      nonNullValue = nonNullValue,
-      emptyList = emptyList(),
-      nonEmptyList = nonEmptyList
-    ) {
-      this.nullableWithNullValue = nullableWithNullValue
-      nullableWithNonNullValue = null
-    }
-
-    val queryResult = connector.getUuidvariantsById.execute(id)
+    val queryResult = connector.getUuidvariantsByKey.execute(key)
     assertThat(queryResult.data.uUIDVariants)
       .isEqualTo(
-        GetUuidvariantsByIdQuery.Data.UUidvariants(
-          nonNullValue = nonNullValue,
-          nullableWithNullValue = nullableWithNullValue,
-          nullableWithNonNullValue = null,
-          emptyList = emptyList(),
-          nonEmptyList = nonEmptyList
+        GetUuidvariantsByKeyQuery.Data.UUidvariants(
+          nonNullValue = UUID.fromString("9ceda52f-18a1-431b-b9f7-89b674ca4bee"),
+          nullableWithNullValue = null,
+          nullableWithNonNullValue = UUID.fromString("7ca7c62a-c551-4cb9-8f86-0a2ce3d68b72"),
         )
       )
   }
 
   @Test
   fun dateVariantsInVariables() = runTest {
-    val id = randomAlphanumericString()
     val dateWithNonZeroTime =
       Calendar.getInstance().apply { set(2024, Calendar.MAY, 23, 11, 12, 13) }.time
 
-    connector.insertDateVariants.execute(
-      id = id,
-      nonNullValue = "2024-04-26".toDate(),
-      minValue = "0001-01-01".toDate(),
-      maxValue = "9999-12-31".toDate(),
-      nonZeroTime = dateWithNonZeroTime,
-      emptyList = emptyList(),
-      nonEmptyList = listOf("1234-05-19", "5678-12-31").map(String::toDate)
-    ) {
-      nullableWithNullValue = null
-      nullableWithNonNullValue = "2024-05-19".toDate()
-    }
+    val key =
+      connector.insertDateVariants
+        .execute(
+          nonNullValue = "2024-04-26".toDate(),
+          minValue = MIN_DATE,
+          maxValue = MAX_DATE,
+          nonZeroTime = dateWithNonZeroTime,
+        ) {
+          nullableWithNullValue = null
+          nullableWithNonNullValue = "2024-05-19".toDate()
+        }
+        .data
+        .key
 
-    val queryRef = connector.getDateVariantsById.ref(id).withStringData()
+    val queryRef = connector.getDateVariantsByKey.ref(key).withStringData()
     val queryResult = queryRef.execute()
     assertThat(queryResult.data.dateVariants)
       .isEqualTo(
-        GetDateVariantsByIdQueryStringData.DateVariants(
+        GetDateVariantsByKeyQueryStringData.DateVariants(
           nonNullValue = "2024-04-26",
           nullableWithNullValue = null,
           nullableWithNonNullValue = "2024-05-19",
-          minValue = "0001-01-01",
+          minValue = "1583-01-01",
           maxValue = "9999-12-31",
           nonZeroTime = "2024-05-23",
-          emptyList = emptyList(),
-          nonEmptyList = listOf("1234-05-19", "5678-12-31")
         )
       )
   }
 
   @Test
   fun timestampVariants() = runTest {
-    val id = randomAlphanumericString()
+    val key =
+      connector.insertTimestampVariants
+        .execute(
+          nonNullValue = Timestamp(1, 3_219),
+          minValue = Timestamp.MIN_VALUE,
+          maxValue = Timestamp.MAX_VALUE,
+        ) {
+          nullableWithNullValue = null
+          nullableWithNonNullValue = Timestamp(-46_239, 4_628)
+        }
+        .data
+        .key
 
-    connector.insertTimestampVariants.execute(
-      id = id,
-      nonNullValue = Timestamp(1, 3_219),
-      minValue = Timestamp(-62_135_596_800, 0),
-      maxValue = Timestamp(253_402_300_799, 999_999_999),
-      emptyList = emptyList(),
-      nonEmptyList = listOf(Timestamp(-543, 41), Timestamp(739, 62))
-    ) {
-      nullableWithNullValue = null
-      nullableWithNonNullValue = Timestamp(-46_239, 4_628)
-    }
-
-    val queryResult = connector.getTimestampVariantsById.execute(id)
+    val queryResult = connector.getTimestampVariantsByKey.execute(key)
 
     /**
      * Note: Timestamp sent from SDK is always 9 digits nanosecond precision, meaning there are 9
@@ -200,14 +319,12 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
      */
     assertTrue(
       queryResult.data.timestampVariants!!.verifySeconds(
-        GetTimestampVariantsByIdQuery.Data.TimestampVariants(
+        GetTimestampVariantsByKeyQuery.Data.TimestampVariants(
           nonNullValue = Timestamp(1, 3_219),
           nullableWithNullValue = null,
           nullableWithNonNullValue = Timestamp(-46_239, 4_628),
-          minValue = Timestamp(-62_135_596_800, 0),
-          maxValue = Timestamp(253_402_300_799, 999_999_999),
-          emptyList = emptyList(),
-          nonEmptyList = listOf(Timestamp(-543, 41), Timestamp(739, 62))
+          minValue = Timestamp.MIN_VALUE,
+          maxValue = Timestamp.MAX_VALUE,
         )
       )
     )
@@ -215,36 +332,29 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
 
   @Test
   fun dateVariantsInData() = runTest {
-    val id = randomAlphanumericString()
-
     val mutationRef =
       connector.insertDateVariants.refWith(
         InsertDateVariantsMutationStringVariables(
-          id = id,
           nonNullValue = "2024-04-26",
           nullableWithNullValue = null,
           nullableWithNonNullValue = "2024-05-19",
-          minValue = "0001-01-01",
+          minValue = "1583-01-01",
           maxValue = "9999-12-31",
           nonZeroTime = "2024-04-24",
-          emptyList = emptyList(),
-          nonEmptyList = listOf("1234-05-19", "5678-12-31")
         )
       )
-    mutationRef.execute()
+    val key = mutationRef.execute().data.key
 
-    val queryResult = connector.getDateVariantsById.execute(id)
+    val queryResult = connector.getDateVariantsByKey.execute(key)
     assertThat(queryResult.data.dateVariants)
       .isEqualTo(
-        GetDateVariantsByIdQuery.Data.DateVariants(
+        GetDateVariantsByKeyQuery.Data.DateVariants(
           nonNullValue = "2024-04-26".toDate(),
           nullableWithNullValue = null,
           nullableWithNonNullValue = "2024-05-19".toDate(),
-          minValue = "0001-01-01".toDate(),
-          maxValue = "9999-12-31".toDate(),
+          minValue = MIN_DATE,
+          maxValue = MAX_DATE,
           nonZeroTime = "2024-04-24".toDate(),
-          emptyList = emptyList(),
-          nonEmptyList = listOf("1234-05-19", "5678-12-31").map(String::toDate)
         )
       )
   }
@@ -253,11 +363,11 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
   //  Make sure to test boundary values, like Int.MAX_VALUE, Float.NaN, true, and false.
 
   private companion object {
-    fun QueryRef<*, GetDateVariantsByIdQuery.Variables>.withStringData() =
+    fun QueryRef<*, GetDateVariantsByKeyQuery.Variables>.withStringData() =
       dataConnect.query(
         operationName,
         variables,
-        serializer<GetDateVariantsByIdQueryStringData>(),
+        serializer<GetDateVariantsByKeyQueryStringData>(),
         variablesSerializer
       )
 
@@ -269,10 +379,10 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
         serializer()
       )
 
-    fun GetTimestampVariantsByIdQuery.Data.TimestampVariants.verifySeconds(
-      other: GetTimestampVariantsByIdQuery.Data.TimestampVariants
+    fun GetTimestampVariantsByKeyQuery.Data.TimestampVariants.verifySeconds(
+      other: GetTimestampVariantsByKeyQuery.Data.TimestampVariants
     ): Boolean {
-      val properties = GetTimestampVariantsByIdQuery.Data.TimestampVariants::class.memberProperties
+      val properties = GetTimestampVariantsByKeyQuery.Data.TimestampVariants::class.memberProperties
       for (field in properties) {
         val actual = field.get(this)
         val expect = field.get(other)
@@ -311,23 +421,20 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
    */
   @Serializable
   data class InsertDateVariantsMutationStringVariables(
-    val id: String,
     val nonNullValue: String,
     val nullableWithNullValue: String?,
     val nullableWithNonNullValue: String?,
     val minValue: String,
     val nonZeroTime: String,
     val maxValue: String,
-    val emptyList: List<String>,
-    val nonEmptyList: List<String>
   )
 
   /**
-   * An alternative to [GetDateVariantsByIdQuery.Data] where the fields are typed as [String]
+   * An alternative to [GetDateVariantsByKeyQuery.Data] where the fields are typed as [String]
    * instead of [Date].
    */
   @Serializable
-  private data class GetDateVariantsByIdQueryStringData(val dateVariants: DateVariants?) {
+  private data class GetDateVariantsByKeyQueryStringData(val dateVariants: DateVariants?) {
 
     @Serializable
     data class DateVariants(
@@ -337,8 +444,6 @@ class ScalarVariablesAndDataIntegrationTest : DemoConnectorIntegrationTestBase()
       val minValue: String,
       val maxValue: String,
       val nonZeroTime: String,
-      val emptyList: List<String>,
-      val nonEmptyList: List<String>
     )
   }
 }
