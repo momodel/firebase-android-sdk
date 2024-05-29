@@ -20,6 +20,7 @@ plugins {
   id("firebase-library")
   id("kotlin-android")
   id("org.jetbrains.kotlin.plugin.serialization") version "1.8.0"
+  id("copy-google-services")
 }
 
 android {
@@ -47,7 +48,7 @@ android {
 }
 
 dependencies {
-  api(project(":firebase-dataconnect"))
+  api("com.google.firebase:firebase-dataconnect:16.0.0-alpha04")
   api(libs.kotlinx.coroutines.core)
   api(libs.kotlinx.serialization.core)
 

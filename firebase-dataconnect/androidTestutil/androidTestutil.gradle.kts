@@ -41,8 +41,8 @@ android {
 }
 
 dependencies {
+  api("com.google.firebase:firebase-dataconnect:16.0.0-alpha04")
   api("com.google.firebase:firebase-common:21.0.0")
-  api(project(":firebase-dataconnect"))
   api(project(":firebase-dataconnect:testutil"))
   api(libs.kotlinx.coroutines.core)
 

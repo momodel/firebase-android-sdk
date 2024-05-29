@@ -29,7 +29,6 @@ buildscript {
                 artifact()
             }
         }
-
     }
 
     dependencies {
@@ -81,6 +80,9 @@ configure(subprojects) {
             metadataSources {
                 artifact()
             }
+        }
+        mavenLocal {
+            url 'file:///home/dconeybe/work/android/dataconnect/firebase-dataconnect/m2'
         }
     }
 

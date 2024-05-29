@@ -24,18 +24,9 @@ fi
 readonly PROJECT_ROOT_DIR="$(dirname "$0")/../.."
 
 readonly TARGETS=(
-  ":firebase-dataconnect:compileDebugKotlin"
-  ":firebase-dataconnect:compileDebugUnitTestKotlin"
-  ":firebase-dataconnect:compileDebugAndroidTestKotlin"
-  ":firebase-dataconnect:androidTestutil:compileDebugKotlin"
-  ":firebase-dataconnect:androidTestutil:compileDebugUnitTestKotlin"
-  ":firebase-dataconnect:androidTestutil:compileDebugAndroidTestKotlin"
   ":firebase-dataconnect:connectors:compileDebugKotlin"
   ":firebase-dataconnect:connectors:compileDebugUnitTestKotlin"
   ":firebase-dataconnect:connectors:compileDebugAndroidTestKotlin"
-  ":firebase-dataconnect:testutil:compileDebugKotlin"
-  ":firebase-dataconnect:testutil:compileDebugUnitTestKotlin"
-  ":firebase-dataconnect:testutil:compileDebugAndroidTestKotlin"
 )
 
 readonly args=(
