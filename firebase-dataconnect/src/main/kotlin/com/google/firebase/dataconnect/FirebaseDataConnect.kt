@@ -21,6 +21,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
 import com.google.firebase.app
 import com.google.firebase.dataconnect.core.FirebaseDataConnectFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationStrategy
 
@@ -81,26 +82,40 @@ import kotlinx.serialization.SerializationStrategy
  *
  * ### Release Notes
  *
- * Release notes for the Firebase Data Connect Android API will be published here until it is merged
+ * Release notes for the Firebase Data Connect Android SDK will be published here until it is merged
  * into the `master` branch of https://github.com/firebase/firebase-android-sdk, at which point the
  * release notes will become part of the regular Android SDK releases.
  *
- * ##### 16.0.0-alpha04 (May 29, 2024)
- * - Fixed time zone issues when serializing java.util.Date objects (
- * [#5976](https://github.com/firebase/firebase-android-sdk/pull/5976))
- * - Changed default port of useEmulator() to 9399 (was 9510); this goes with a change to the Data
- * Connect Emulator v1.1.19 (firebase-tools v13.10.2) that changes the default port to 9399. (
- * [#5996](https://github.com/firebase/firebase-android-sdk/pull/5996))
+ * #### 16.0.0-alpha05 (not yet released)
+ * - [#6003](https://github.com/firebase/firebase-android-sdk/pull/6003]) Fixed [close] to
+ * _actually_ close the underlying grpc network resources. Also, added [suspendingClose] to allow
+ * callers to wait for the asynchronous closing work to complete.
+ * - [#6005](https://github.com/firebase/firebase-android-sdk/pull/6005) Fixed a StrictMode
+ * violation upon the first network request being sent.
+ * - [#6006](https://github.com/firebase/firebase-android-sdk/pull/6006) Improved debug logging of
+ * GRPC requests and responses.
+ * - [#6038](https://github.com/firebase/firebase-android-sdk/pull/6038) Fixed an bug with incorrect
+ * Timestamp serialization due to miscalculation in timezone decoding.
+ * - [#6052](https://github.com/firebase/firebase-android-sdk/pull/6052) Automatically retry
+ * operations (executing queries and mutations) that fail due to an expired authentication token,
+ * with a new authentication token.
  *
- * ##### 16.0.0-alpha03 (May 15, 2024)
+ * #### 16.0.0-alpha04 (May 29, 2024)
+ * - [#5976](https://github.com/firebase/firebase-android-sdk/pull/5976) Fixed time zone issues when
+ * serializing java.util.Date objects
+ * - [#5996](https://github.com/firebase/firebase-android-sdk/pull/5996) Changed default port of
+ * useEmulator() to 9399 (was 9510); this goes with a change to the Data Connect Emulator v1.1.19
+ * (firebase-tools v13.10.2) that changes the default port to 9399.
+ *
+ * #### 16.0.0-alpha03 (May 15, 2024)
  * - KDoc comments added.
  * - OptionalVariable: fix potential NullPointerException in toString() and hashCode().
  * - TimestampSerializer: add support for time zones specified using +HH:MM or -HH:MM.
  *
- * ##### 16.0.0-alpha02 (May 13, 2024)
+ * #### 16.0.0-alpha02 (May 13, 2024)
  * - Internal code cleanup; no externally-visible changes.
  *
- * ##### 16.0.0-alpha01 (May 08, 2024)
+ * #### 16.0.0-alpha01 (May 08, 2024)
  * - Initial release.
  *
  * ### Safe for Concurrent Use
@@ -150,8 +165,8 @@ public interface FirebaseDataConnect : AutoCloseable {
    * To start the Data Connect emulator from the command line, first install Firebase Tools as
    * documented at https://firebase.google.com/docs/emulator-suite/install_and_configure then run
    * `firebase emulators:start --only auth,dataconnect`. Enabling the "auth" emulator is only needed
-   * if using [FirebaseAuth] to authenticate users. You may also need to specify `--project
-   * <projectId>` if the Firebase tools are unable to auto-detect the project ID.
+   * if using [com.google.firebase.auth.FirebaseAuth] to authenticate users. You may also need to
+   * specify `--project <projectId>` if the Firebase tools are unable to auto-detect the project ID.
    *
    * @param host The host name or IP address of the Data Connect emulator to which to connect. The
    * default value, 10.0.2.2, is a magic IP address that the Android Emulator aliases to the host
@@ -196,15 +211,37 @@ public interface FirebaseDataConnect : AutoCloseable {
    *
    * This method returns immediately, possibly before in-flight queries and mutations are completed.
    * Any future attempts to execute queries or mutations returned from [query] or [mutation] will
-   * immediately fail.
+   * immediately fail. To wait for the in-flight queries and mutations to complete, call
+   * [suspendingClose] instead.
    *
-   * It is safe to call this method multiple times; subsequent invocations have no effect and return
-   * as if successful.
+   * It is safe to call this method multiple times. On subsequent invocations, if the previous
+   * closing attempt failed then it will be re-tried.
    *
    * After this method returns, calling [FirebaseDataConnect.Companion.getInstance] with the same
    * [app] and [config] will return a new instance, rather than returning this instance.
+   *
+   * @see suspendingClose
    */
   override fun close()
+
+  /**
+   * A version of [close] that has the same semantics, but suspends until the asynchronous work is
+   * complete.
+   *
+   * If the asynchronous work fails, then the exception from the asynchronous work is rethrown by
+   * this method.
+   *
+   * Using this method in tests may be useful to ensure that this object is fully shut down after
+   * each test case. This is especially true if tests create [FirebaseDataConnect] in rapid
+   * succession which could starve resources if they are all active simultaneously. In those cases,
+   * it may be a good idea to call [suspendingClose] instead of [close] to ensure that each instance
+   * is fully shut down before a new one is created. In normal production applications, where
+   * instances of [FirebaseDataConnect] are created infrequently, calling [close] should be
+   * sufficient, and avoids having to create a [CoroutineScope] just to close the object.
+   *
+   * @see close
+   */
+  public suspend fun suspendingClose()
 
   /**
    * Compares this object with another object for equality, using the `===` operator.
@@ -285,7 +322,7 @@ public fun FirebaseDataConnect.Companion.getInstance(
   config: ConnectorConfig,
   settings: DataConnectSettings = DataConnectSettings(),
 ): FirebaseDataConnect =
-  app.get(FirebaseDataConnectFactory::class.java).run { get(config = config, settings = settings) }
+  app.get(FirebaseDataConnectFactory::class.java).get(config = config, settings = settings)
 
 /**
  * Returns the instance of [FirebaseDataConnect] associated with the default [FirebaseApp] and the

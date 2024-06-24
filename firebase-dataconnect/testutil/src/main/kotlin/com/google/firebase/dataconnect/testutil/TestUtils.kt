@@ -17,13 +17,21 @@
 package com.google.firebase.dataconnect.testutil
 
 import com.google.common.truth.StringSubject
+import com.google.firebase.FirebaseApp
+import com.google.firebase.dataconnect.DataConnectSettings
+import com.google.firebase.dataconnect.OperationRef
+import com.google.firebase.util.nextAlphanumericString
 import java.util.UUID
 import java.util.regex.Pattern
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.random.Random
 import kotlin.reflect.KClass
 import kotlin.reflect.safeCast
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.junit.Assert
 
 /**
@@ -32,9 +40,18 @@ import org.junit.Assert
  * if any, is also a non-word character. This effectively verifies that the given string is included
  * in the string being checked without being "mashed" into adjacent text.
  */
-fun StringSubject.containsWithNonAdjacentText(text: String, ignoreCase: Boolean = false) {
-  val pattern = "(^|\\W)${Pattern.quote(text)}($|\\W)"
-  val expr = Pattern.compile(pattern, if (ignoreCase) Pattern.CASE_INSENSITIVE else 0)
+fun StringSubject.containsWithNonAdjacentText(text: String, ignoreCase: Boolean = false) =
+  containsMatchWithNonAdjacentText(Pattern.quote(text), ignoreCase = ignoreCase)
+
+/**
+ * Asserts that a string contains a pattern, verifying that the character immediately preceding the
+ * text, if any, is a non-word character, and that the character immediately following the text, if
+ * any, is also a non-word character. This effectively verifies that the given pattern is included
+ * in the string being checked without being "mashed" into adjacent text.
+ */
+fun StringSubject.containsMatchWithNonAdjacentText(pattern: String, ignoreCase: Boolean = false) {
+  val fullPattern = "(^|\\W)${pattern}($|\\W)"
+  val expr = Pattern.compile(fullPattern, if (ignoreCase) Pattern.CASE_INSENSITIVE else 0)
   containsMatch(expr)
 }
 
@@ -79,6 +96,11 @@ fun fail(message: String): Nothing {
 }
 
 /** Calls the given block and asserts that it throws the given exception. */
+@Deprecated(
+  message = "use io.kotest.assertions.throwables.shouldThrow instead",
+  replaceWith =
+    ReplaceWith(expression = "shouldThrow<E> {...}", "io.kotest.assertions.throwables.shouldThrow")
+)
 inline fun <T, R, E : Any> T.assertThrows(expectedException: KClass<E>, block: T.() -> R): E =
   runCatching { block() }
     .fold(
@@ -100,3 +122,75 @@ inline fun <T, R, E : Any> T.assertThrows(expectedException: KClass<E>, block: T
  * Taken from `Number.MAX_SAFE_INTEGER` in JavaScript.
  */
 const val MAX_SAFE_INTEGER = 9007199254740991.0
+
+/**
+ * Generates and returns a random, valid string suitable to be the "name" of a [FirebaseApp].
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "fmfbm74g32").
+ */
+fun randomAppName(key: String) = "appName-$key-${Random.nextAlphanumericString(length = 8)}"
+
+/**
+ * Generates and returns a random, valid string suitable to be the "applicationId" of a
+ * [FirebaseApp].
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "axqm2rajxv").
+ */
+fun randomApplicationId(key: String) = "appId-$key-${Random.nextAlphanumericString(length = 8)}"
+
+/**
+ * Generates and returns a random, valid string suitable to be the "projectId" of a [FirebaseApp].
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "ncdd6n863r").
+ */
+@Deprecated(
+  "use Arb.projectId() from Arbs.kt instead",
+  replaceWith =
+    ReplaceWith("Arb.projectId(key).next()", "com.google.firebase.dataconnect.testutil.projectId")
+)
+fun randomProjectId(key: String) = "projId-$key-${Random.nextAlphanumericString(length = 8)}"
+
+/**
+ * Generates and returns a random, valid string suitable to be a host name in [DataConnectSettings].
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "cxncg4zbvb").
+ */
+fun randomHost(key: String) = "host.$key.${Random.nextAlphanumericString(length = 8)}"
+
+/** Generates and returns a boolean value suitable for "sslEnabled". */
+fun randomSslEnabled() = Random.nextBoolean()
+
+/**
+ * Generates and returns a new [DataConnectSettings] object with random values.
+ * @param hostKey A value to specify to [randomHost] (e.g. "wqxhf5apez").
+ */
+fun randomDataConnectSettings(hostKey: String) =
+  DataConnectSettings(host = randomHost(hostKey), sslEnabled = randomSslEnabled())
+
+/**
+ * Generates and returns a random, valid string suitable for a "request ID".
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "9p6dyyr2zp").
+ */
+@Deprecated(
+  "use Arb.requestId() from Arbs.kt instead",
+  replaceWith =
+    ReplaceWith("Arb.requestId(key).next()", "com.google.firebase.dataconnect.testutil.requestId")
+)
+fun randomRequestId(key: String) = "requestId_${key}_${Random.nextAlphanumericString(length = 8)}"
+
+/**
+ * Generates and returns a random, valid string suitable for [OperationRef.operationName].
+ * @param key A hardcoded random string that will be incorporated into the returned string; useful
+ * for correlating the application ID with its call site (e.g. "sc4kc7mqba").
+ */
+@Deprecated(
+  "use Arb.requestId() from Arbs.kt instead",
+  replaceWith =
+    ReplaceWith(
+      "Arb.operationName(key).next()",
+      "com.google.firebase.dataconnect.testutil.requestId"
+    )
+)
+fun randomOperationName(key: String) =
+  "operation_${key}_${Random.nextAlphanumericString(length = 8)}"

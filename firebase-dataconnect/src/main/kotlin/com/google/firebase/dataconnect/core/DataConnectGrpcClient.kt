@@ -16,115 +16,35 @@
 
 package com.google.firebase.dataconnect.core
 
-import android.content.Context
-import com.google.android.gms.security.ProviderInstaller
 import com.google.firebase.dataconnect.*
-import com.google.firebase.dataconnect.core.DataConnectAuth.Companion.withScrubbedAccessToken
-import com.google.firebase.dataconnect.util.SuspendingLazy
 import com.google.firebase.dataconnect.util.decodeFromStruct
-import com.google.firebase.dataconnect.util.toCompactString
 import com.google.firebase.dataconnect.util.toMap
 import com.google.protobuf.ListValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
-import google.firebase.dataconnect.proto.ConnectorServiceGrpc
-import google.firebase.dataconnect.proto.ConnectorServiceGrpcKt.ConnectorServiceCoroutineStub
 import google.firebase.dataconnect.proto.GraphqlError
+import google.firebase.dataconnect.proto.SourceLocation
 import google.firebase.dataconnect.proto.executeMutationRequest
 import google.firebase.dataconnect.proto.executeQueryRequest
-import io.grpc.ManagedChannel
-import io.grpc.ManagedChannelBuilder
-import io.grpc.Metadata
-import io.grpc.android.AndroidChannelBuilder
-import java.util.concurrent.Executor
-import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.async
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import io.grpc.Status
+import io.grpc.StatusException
 import kotlinx.serialization.DeserializationStrategy
 
 internal class DataConnectGrpcClient(
-  context: Context,
   projectId: String,
-  private val connector: ConnectorConfig,
+  connector: ConnectorConfig,
+  private val grpcRPCs: DataConnectGrpcRPCs,
   private val dataConnectAuth: DataConnectAuth,
-  host: String,
-  sslEnabled: Boolean,
-  private val blockingExecutor: Executor,
-  parentLogger: Logger,
+  private val logger: Logger,
 ) {
-  private val logger =
-    Logger("DataConnectGrpcClient").apply {
-      debug {
-        "Created by ${parentLogger.nameWithId};" +
-          " projectId=$projectId" +
-          " connector=$connector" +
-          " host=$host" +
-          " sslEnabled=$sslEnabled"
-      }
-    }
+  val instanceId: String
+    get() = logger.nameWithId
 
   private val requestName =
     "projects/$projectId/" +
       "locations/${connector.location}" +
       "/services/${connector.serviceId}" +
       "/connectors/${connector.connector}"
-
-  private val blockingDispatcher = blockingExecutor.asCoroutineDispatcher()
-
-  private val closedMutex = Mutex()
-  private var closed = false
-
-  private val lazyGrpcChannel =
-    SuspendingLazy(closedMutex, blockingDispatcher) {
-      if (closed) throw IllegalStateException("DataConnectGrpcClient instance has been closed")
-
-      logger.debug { "${ManagedChannel::class.qualifiedName} initialization started" }
-
-      // Upgrade the Android security provider using Google Play Services.
-      //
-      // We need to upgrade the Security Provider before any network channels are initialized
-      // because okhttp maintains a list of supported providers that is initialized when the JVM
-      // first resolves the static dependencies of ManagedChannel.
-      //
-      // If initialization fails for any reason, then a warning is logged and the original,
-      // un-upgraded security provider is used.
-      try {
-        ProviderInstaller.installIfNeeded(context)
-      } catch (e: Exception) {
-        logger.warn(e) { "Failed to update ssl context" }
-      }
-
-      val channel =
-        ManagedChannelBuilder.forTarget(host).let {
-          if (!sslEnabled) {
-            it.usePlaintext()
-          }
-
-          // Ensure gRPC recovers from a dead connection. This is not typically necessary, as
-          // the OS will  usually notify gRPC when a connection dies. But not always. This acts as a
-          // failsafe.
-          it.keepAliveTime(30, TimeUnit.SECONDS)
-
-          it.executor(blockingExecutor)
-
-          // Wrap the `ManagedChannelBuilder` in an `AndroidChannelBuilder`. This allows the channel
-          // to respond more gracefully to network change events, such as switching from cellular to
-          // wifi.
-          AndroidChannelBuilder.usingBuilder(it).context(context).build()
-        }
-
-      logger.debug { "${ManagedChannel::class.qualifiedName} initialization completed" }
-
-      channel
-    }
-
-  private val lazyGrpcStub = SuspendingLazy { ConnectorServiceCoroutineStub(lazyGrpcChannel.get()) }
 
   data class OperationResult(
     val data: Struct?,
@@ -142,25 +62,10 @@ internal class DataConnectGrpcClient(
       this.variables = variables
     }
 
-    logger.debug {
-      val method = ConnectorServiceGrpc.getExecuteQueryMethod()
-      "executeQuery() [rid=$requestId] sending RPC \"${method.fullMethodName}\" with " +
-        "ExecuteQueryRequest: ${request.toCompactString()}"
-    }
     val response =
-      lazyGrpcStub
-        .get()
-        .runCatching { executeQuery(request, createMetadata(requestId)) }
-        .onFailure {
-          logger.warn(it) {
-            "executeQuery() [rid=$requestId] grpc call FAILED with ${it::class.qualifiedName}"
-          }
-        }
-        .getOrThrow()
-    logger.debug {
-      "executeQuery() [rid=$requestId] received: " +
-        "ExecuteQueryResponse ${response.toCompactString()}"
-    }
+      grpcRPCs.retryOnGrpcUnauthenticatedError(requestId, "executeQuery") {
+        executeQuery(requestId, request)
+      }
 
     return OperationResult(
       data = if (response.hasData()) response.data else null,
@@ -179,25 +84,10 @@ internal class DataConnectGrpcClient(
       this.variables = variables
     }
 
-    logger.debug {
-      val method = ConnectorServiceGrpc.getExecuteMutationMethod()
-      "executeMutation() [rid=$requestId] sending RPC \"${method.fullMethodName}\" with " +
-        "ExecuteMutationRequest: ${request.toCompactString()}"
-    }
     val response =
-      lazyGrpcStub
-        .get()
-        .runCatching { executeMutation(request, createMetadata(requestId)) }
-        .onFailure {
-          logger.warn(it) {
-            "executeMutation() [rid=$requestId] grpc call FAILED with ${it::class.qualifiedName}"
-          }
-        }
-        .getOrThrow()
-    logger.debug {
-      "executeMutation() [rid=$requestId] received: " +
-        "ExecuteMutationResponse ${response.toCompactString()}"
-    }
+      grpcRPCs.retryOnGrpcUnauthenticatedError(requestId, "executeMutation") {
+        executeMutation(requestId, request)
+      }
 
     return OperationResult(
       data = if (response.hasData()) response.data else null,
@@ -205,74 +95,24 @@ internal class DataConnectGrpcClient(
     )
   }
 
-  private val closingMutex = Mutex()
-  private var awaitTerminationJob: Deferred<Unit>? = null
-  private var closeCompleted = false
-
-  private suspend fun createMetadata(requestId: String): Metadata {
-    val token = dataConnectAuth.getAccessToken(requestId)
-
-    return Metadata()
-      .apply {
-        put(googRequestParamsHeader, "location=${connector.location}&frontend=data")
-        if (token !== null) {
-          put(firebaseAuthTokenHeader, token)
-        }
+  private suspend inline fun <T, R> T.retryOnGrpcUnauthenticatedError(
+    requestId: String,
+    kotlinMethodName: String,
+    block: T.() -> R
+  ): R {
+    return try {
+      block()
+    } catch (e: StatusException) {
+      if (e.status != Status.UNAUTHENTICATED) {
+        throw e
       }
-      .also {
-        logger.debug {
-          "[rid=$requestId] Sending grpc metadata \"${googRequestParamsHeader.name()}\": " +
-            it.get(googRequestParamsHeader)
-        }
-        logger.debug {
-          it.get(firebaseAuthTokenHeader).let { authHeaderValue ->
-            if (authHeaderValue === null) {
-              "[rid=$requestId] Not sending grpc metadata \"${firebaseAuthTokenHeader.name()}\" " +
-                "because no auth token is available"
-            } else {
-              "[rid=$requestId] Sending grpc metadata \"${firebaseAuthTokenHeader.name()}\": " +
-                it.get(firebaseAuthTokenHeader)?.withScrubbedAccessToken(token ?: "")
-            }
-          }
-        }
+      logger.warn(e) {
+        "$kotlinMethodName() [rid=$requestId]" +
+          " retrying with fresh auth token due to UNAUTHENTICATED error"
       }
-  }
-
-  suspend fun close() {
-    closedMutex.withLock { closed = true }
-
-    closingMutex.withLock {
-      if (!closeCompleted) {
-        closeGrpcChannel()
-      }
-      closeCompleted = true
+      dataConnectAuth.forceRefresh()
+      block()
     }
-  }
-
-  // This function _must_ be called by a coroutine that has acquired the lock on `closingMutex`.
-  @OptIn(DelicateCoroutinesApi::class)
-  private suspend fun closeGrpcChannel() {
-    val grpcChannel = lazyGrpcChannel.initializedValueOrNull ?: return
-
-    val job =
-      awaitTerminationJob?.let { if (it.isCancelled && it.isCompleted) null else it }
-        ?: GlobalScope.async<Unit> {
-            withContext(blockingDispatcher) {
-              grpcChannel.awaitTermination(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
-            }
-          }
-          .also { awaitTerminationJob = it }
-
-    job.await()
-  }
-
-  private companion object {
-    private val firebaseAuthTokenHeader =
-      Metadata.Key.of("x-firebase-auth-token", Metadata.ASCII_STRING_MARSHALLER)
-
-    @Suppress("SpellCheckingInspection")
-    private val googRequestParamsHeader =
-      Metadata.Key.of("x-goog-request-params", Metadata.ASCII_STRING_MARSHALLER)
   }
 }
 
@@ -285,8 +125,19 @@ internal fun ListValue.toPathSegment() =
     }
   }
 
+internal fun List<SourceLocation>.toSourceLocations(): List<DataConnectError.SourceLocation> =
+  buildList {
+    this@toSourceLocations.forEach {
+      add(DataConnectError.SourceLocation(line = it.line, column = it.column))
+    }
+  }
+
 internal fun GraphqlError.toDataConnectError() =
-  DataConnectError(message = message, path = path.toPathSegment(), extensions = emptyMap())
+  DataConnectError(
+    message = message,
+    path = path.toPathSegment(),
+    this.locationsList.toSourceLocations()
+  )
 
 internal fun <T> DataConnectGrpcClient.OperationResult.deserialize(
   dataDeserializer: DeserializationStrategy<T>

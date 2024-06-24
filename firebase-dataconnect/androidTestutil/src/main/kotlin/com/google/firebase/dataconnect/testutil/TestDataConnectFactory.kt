@@ -20,6 +20,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.dataconnect.*
 import com.google.firebase.util.nextAlphanumericString
 import kotlin.random.Random
+import kotlinx.coroutines.runBlocking
 
 /**
  * A JUnit test rule that creates instances of [FirebaseDataConnect] for use during testing, and
@@ -28,13 +29,13 @@ import kotlin.random.Random
 class TestDataConnectFactory(val firebaseAppFactory: TestFirebaseAppFactory) :
   FactoryTestRule<FirebaseDataConnect, TestDataConnectFactory.Params>() {
 
-  val backend: DataConnectBackend
-    get() = DataConnectBackend.fromInstrumentationArguments()
-
   fun newInstance(config: ConnectorConfig): FirebaseDataConnect =
     config.run {
       newInstance(Params(connector = connector, location = location, serviceId = serviceId))
     }
+
+  fun newInstance(backend: DataConnectBackend): FirebaseDataConnect =
+    newInstance(Params(backend = backend))
 
   fun newInstance(firebaseApp: FirebaseApp, config: ConnectorConfig): FirebaseDataConnect =
     newInstance(
@@ -58,11 +59,12 @@ class TestDataConnectFactory(val firebaseAppFactory: TestFirebaseAppFactory) :
         serviceId = params?.serviceId ?: "TestService$instanceId",
       )
 
+    val backend = params?.backend ?: DataConnectBackend.fromInstrumentationArguments()
     return backend.getDataConnect(firebaseApp, connectorConfig)
   }
 
   override fun destroyInstance(instance: FirebaseDataConnect) {
-    instance.close()
+    runBlocking { instance.suspendingClose() }
   }
 
   data class Params(
@@ -70,5 +72,6 @@ class TestDataConnectFactory(val firebaseAppFactory: TestFirebaseAppFactory) :
     val connector: String? = null,
     val location: String? = null,
     val serviceId: String? = null,
+    val backend: DataConnectBackend? = null,
   )
 }

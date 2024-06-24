@@ -24,10 +24,14 @@ import com.google.protobuf.Value
 import com.google.protobuf.Value.KindCase
 import com.google.protobuf.listValueOrNull
 import com.google.protobuf.structValueOrNull
+import google.firebase.dataconnect.proto.EmulatorInfo
+import google.firebase.dataconnect.proto.EmulatorIssue
+import google.firebase.dataconnect.proto.EmulatorIssuesResponse
 import google.firebase.dataconnect.proto.ExecuteMutationRequest
 import google.firebase.dataconnect.proto.ExecuteMutationResponse
 import google.firebase.dataconnect.proto.ExecuteQueryRequest
 import google.firebase.dataconnect.proto.ExecuteQueryResponse
+import google.firebase.dataconnect.proto.ServiceInfo
 import java.io.BufferedWriter
 import java.io.CharArrayWriter
 import java.io.DataOutputStream
@@ -218,11 +222,11 @@ internal fun buildStructProto(
 ): Struct = StructProtoBuilder(initialValues).apply(block).build()
 
 /** Generates and returns a string similar to [Struct.toString] but more compact. */
-internal fun Struct.toCompactString(): String =
-  Value.newBuilder().setStructValue(this).build().toCompactString()
+internal fun Struct.toCompactString(keySortSelector: ((String) -> String)? = null): String =
+  Value.newBuilder().setStructValue(this).build().toCompactString(keySortSelector)
 
 /** Generates and returns a string similar to [Value.toString] but more compact. */
-internal fun Value.toCompactString(): String {
+internal fun Value.toCompactString(keySortSelector: ((String) -> String)? = null): String {
   val charArrayWriter = CharArrayWriter()
   val out = BufferedWriter(charArrayWriter)
   var indent = 0
@@ -255,7 +259,7 @@ internal fun Value.toCompactString(): String {
           out.write("{")
           indent++
           it.structValue.fieldsMap.entries
-            .sortedBy { (key, _) -> key }
+            .sortedBy { (key, _) -> keySortSelector?.invoke(key) ?: key }
             .forEach { (structElementKey, structElementValue) ->
               out.newLine()
               out.writeIndent()
@@ -277,35 +281,55 @@ internal fun Value.toCompactString(): String {
   return charArrayWriter.toString()
 }
 
-internal fun ExecuteQueryRequest.toCompactString(): String =
-  buildStructProto {
-      put("name", name)
-      put("operationName", operationName)
-      if (hasVariables()) put("variables", variables)
-    }
-    .toCompactString()
+internal fun ExecuteQueryRequest.toCompactString(): String = toStructProto().toCompactString()
 
-internal fun ExecuteQueryResponse.toCompactString(): String =
-  buildStructProto {
-      if (hasData()) put("data", data)
-      putList("errors") { errorsList.forEach { add(it.toDataConnectError().toString()) } }
-    }
-    .toCompactString()
+internal fun ExecuteQueryRequest.toStructProto(): Struct = buildStructProto {
+  put("name", name)
+  put("operationName", operationName)
+  if (hasVariables()) put("variables", variables)
+}
 
-internal fun ExecuteMutationRequest.toCompactString(): String =
-  buildStructProto {
-      put("name", name)
-      put("operationName", operationName)
-      if (hasVariables()) put("variables", variables)
-    }
-    .toCompactString()
+internal fun ExecuteQueryResponse.toCompactString(): String = toStructProto().toCompactString()
 
-internal fun ExecuteMutationResponse.toCompactString(): String =
-  buildStructProto {
-      if (hasData()) put("data", data)
-      putList("errors") { errorsList.forEach { add(it.toDataConnectError().toString()) } }
-    }
-    .toCompactString()
+internal fun ExecuteQueryResponse.toStructProto(): Struct = buildStructProto {
+  if (hasData()) put("data", data)
+  putList("errors") { errorsList.forEach { add(it.toDataConnectError().toString()) } }
+}
+
+internal fun ExecuteMutationRequest.toCompactString(): String = toStructProto().toCompactString()
+
+internal fun ExecuteMutationRequest.toStructProto(): Struct = buildStructProto {
+  put("name", name)
+  put("operationName", operationName)
+  if (hasVariables()) put("variables", variables)
+}
+
+internal fun ExecuteMutationResponse.toCompactString(): String = toStructProto().toCompactString()
+
+internal fun ExecuteMutationResponse.toStructProto(): Struct = buildStructProto {
+  if (hasData()) put("data", data)
+  putList("errors") { errorsList.forEach { add(it.toDataConnectError().toString()) } }
+}
+
+internal fun EmulatorInfo.toStructProto(): Struct = buildStructProto {
+  put("version", version)
+  putList("services") { servicesList.forEach { add(it.toStructProto()) } }
+}
+
+internal fun ServiceInfo.toStructProto(): Struct = buildStructProto {
+  put("service_id", serviceId)
+  put("connection_string", connectionString)
+}
+
+internal fun EmulatorIssuesResponse.toStructProto(): Struct = buildStructProto {
+  putList("issues") { issuesList.forEach { add(it.toStructProto()) } }
+}
+
+internal fun EmulatorIssue.toStructProto(): Struct = buildStructProto {
+  put("kind", kind.name)
+  put("severity", severity.name)
+  put("message", message)
+}
 
 internal fun Struct.toMap(): Map<String, Any?> {
   val mutualRecursion =
