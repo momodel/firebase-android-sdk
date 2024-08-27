@@ -14,104 +14,154 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalKotest::class)
+@file:UseSerializers(UUIDSerializer::class)
+
 package com.google.firebase.dataconnect
 
+import com.google.firebase.dataconnect.serializers.UUIDSerializer
 import com.google.firebase.dataconnect.testutil.DataConnectIntegrationTestBase
-import com.google.firebase.dataconnect.testutil.schemas.AllTypesSchema
+import com.google.firebase.dataconnect.testutil.EdgeCases
+import com.google.firebase.dataconnect.testutil.anyScalar
+import com.google.firebase.dataconnect.testutil.anyScalarNotMatching
+import com.google.firebase.dataconnect.testutil.expectedAnyScalarRoundTripValue
 import io.kotest.assertions.asClue
 import io.kotest.assertions.assertSoftly
 import io.kotest.assertions.withClue
+import io.kotest.common.ExperimentalKotest
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveAtLeastSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContainIgnoringCase
 import io.kotest.property.Arb
-import io.kotest.property.arbitrary.Codepoint
-import io.kotest.property.arbitrary.arabic
-import io.kotest.property.arbitrary.arbitrary
-import io.kotest.property.arbitrary.ascii
-import io.kotest.property.arbitrary.boolean
-import io.kotest.property.arbitrary.choice
-import io.kotest.property.arbitrary.cyrillic
-import io.kotest.property.arbitrary.double
-import io.kotest.property.arbitrary.egyptianHieroglyphs
+import io.kotest.property.EdgeConfig
+import io.kotest.property.PropTestConfig
+import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.filterIsInstance
-import io.kotest.property.arbitrary.filterNot
-import io.kotest.property.arbitrary.int
-import io.kotest.property.arbitrary.merge
-import io.kotest.property.arbitrary.of
-import io.kotest.property.arbitrary.string
+import io.kotest.property.arbitrary.next
 import io.kotest.property.assume
 import io.kotest.property.checkAll
+import java.util.UUID
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.serializer
 import org.junit.Test
 
 class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   private val dataConnect: FirebaseDataConnect by lazy {
-    val connectorConfig = testConnectorConfig.copy(connector = AllTypesSchema.CONNECTOR)
+    val connectorConfig = testConnectorConfig.copy(connector = "demo")
     dataConnectFactory.newInstance(connectorConfig)
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type NonNullableAnyScalar @table { value: Any! }
-  // mutation InsertIntoNonNullableAnyScalar($value: Any!) { key: ...}
-  // query GetFromNonNullableAnyScalarById($id: UUID!) { item: ...}
+  // type NonNullableAnyScalar @table { value: Any!, tag: String }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
-  fun nonNullAnyScalarEdgeCasesRoundTrip() = runTest {
+  fun nonNullableAnyScalar_MutationVariableEdgeCases() = runTest {
     assertSoftly {
-      for (value in anyScalarEdgeCases.filterNotNull()) {
+      for (value in EdgeCases.anyScalars.filterNotNull()) {
         withClue("value=$value") {
-          val id = executeInsertMutation("InsertIntoNonNullableAnyScalar", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
-          verifyQueryResult("GetFromNonNullableAnyScalarById", id, expectedQueryResult)
+          verifyAnyScalarRoundTrip(
+            value,
+            insertMutationName = "NonNullableAnyScalarInsert",
+            getByKeyQueryName = "NonNullableAnyScalarGetByKey",
+          )
         }
       }
     }
   }
 
   @Test
-  fun nonNullAnyScalarNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar()) { value ->
-      assume(value !== null)
-      val id = executeInsertMutation("InsertIntoNonNullableAnyScalar", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromNonNullableAnyScalarById", id, expectedQueryResult)
+  fun nonNullableAnyScalar_QueryVariableEdgeCases() = runTest {
+    assertSoftly {
+      for (value in EdgeCases.anyScalars.filterNotNull()) {
+        val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
+        withClue("value=$value otherValues=$otherValues") {
+          verifyAnyScalarQueryVariable(
+            value,
+            otherValues[0],
+            otherValues[1],
+            insert3MutationName = "NonNullableAnyScalarInsert3",
+            getAllByTagAndValueQueryName = "NonNullableAnyScalarGetAllByTagAndValue"
+          )
+        }
+      }
     }
   }
 
   @Test
-  fun mutationMissingNonNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoNonNullableAnyScalar", EmptyVariables)
+  fun nonNullableAnyScalar_MutationVariableNormalCases() = runTest {
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      assume(value !== null)
+      verifyAnyScalarRoundTrip(
+        value,
+        insertMutationName = "NonNullableAnyScalarInsert",
+        getByKeyQueryName = "NonNullableAnyScalarGetByKey",
+      )
+    }
   }
 
   @Test
-  fun mutationNullValueForNonNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoNonNullableAnyScalar", null)
+  fun nonNullableAnyScalar_QueryVariableNormalCases() = runTest {
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      assume(value !== null)
+      val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
+      verifyAnyScalarQueryVariable(
+        value,
+        otherValues[0],
+        otherValues[1],
+        insert3MutationName = "NonNullableAnyScalarInsert3",
+        getAllByTagAndValueQueryName = "NonNullableAnyScalarGetAllByTagAndValue"
+      )
+    }
+  }
+
+  @Test
+  fun nonNullableAnyScalar_MutationVariableFailsIfMissing() = runTest {
+    verifyMutationWithMissingAnyVariableFails("NonNullableAnyScalarInsert")
+  }
+
+  @Test
+  fun nonNullableAnyScalar_QueryVariableFailsIfMissing() = runTest {
+    verifyQueryWithMissingAnyVariableFails("NonNullableAnyScalarGetAllByTagAndValue")
+  }
+
+  @Test
+  fun nonNullableAnyScalar_MutationVariableFailsIfNull() = runTest {
+    verifyMutationWithNullVariableValueFails("NonNullableAnyScalarInsert")
+  }
+
+  @Test
+  fun nonNullableAnyScalar_QueryVariableFailsIfNull() = runTest {
+    verifyQueryWithNullVariableValueFails("NonNullableAnyScalarGetAllByTagAndValue")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
   // type NullableAnyScalar @table { value: Any }
   // mutation InsertIntoNullableAnyScalar($value: Any) { key: ... }
-  // query GetFromNullableAnyScalarById($id: UUID!) { item: }
+  // query GetFromNullableAnyScalarByKey($key: NullableAnyScalar_Key!) { item: ... }
+  // query GetFromNullableAnyScalarByIdAndValue($id: UUID!, $value: Any) { items: ... }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
   fun nullableAnyScalarEdgeCasesRoundTrip() = runTest {
     assertSoftly {
-      for (value in anyScalarEdgeCases) {
+      for (value in EdgeCases.anyScalars) {
         withClue("value=$value") {
-          val id = executeInsertMutation("InsertIntoNullableAnyScalar", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
-          verifyQueryResult("GetFromNullableAnyScalarById", id, expectedQueryResult)
+          verifyAnyScalarRoundTrip(
+            value,
+            insertMutationName = "InsertIntoNullableAnyScalar",
+            getByKeyQueryName = "GetFromNullableAnyScalarByKey",
+          )
         }
       }
     }
@@ -119,23 +169,72 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nullableAnyScalarNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar()) { value ->
-      val id = executeInsertMutation("InsertIntoNullableAnyScalar", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromNullableAnyScalarById", id, expectedQueryResult)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      verifyAnyScalarRoundTrip(
+        value,
+        insertMutationName = "InsertIntoNullableAnyScalar",
+        getByKeyQueryName = "GetFromNullableAnyScalarByKey",
+      )
     }
   }
 
   @Test
   fun mutationMissingNullableAnyVariableShouldUseNull() = runTest {
-    val id = executeInsertMutation("InsertIntoNullableAnyScalar", EmptyVariables).key.id
-    verifyQueryResult("GetFromNullableAnyScalarById", id, null)
+    val key = executeInsertMutation("InsertIntoNullableAnyScalar", EmptyVariables)
+    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
   }
 
   @Test
   fun mutationNullForNullableAnyVariableShouldBeSetToNull() = runTest {
-    val id = executeInsertMutation("InsertIntoNullableAnyScalar", null).key.id
-    verifyQueryResult("GetFromNullableAnyScalarById", id, null)
+    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
+    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
+  }
+
+  @Test
+  fun queryMissingNullableAnyVariableShouldSucceed() = runTest {
+    // TODO: factor this out to a reuable method
+    val value = Arb.anyScalar().next()
+    val key = executeInsertMutation("InsertIntoNullableAnyScalar", value)
+    val id = UUIDSerializer.serialize(key.id)
+
+    val queryRef =
+      dataConnect.query(
+        operationName = "GetFromNullableAnyScalarByIdAndValue",
+        variables = IdQueryVariables(key.id),
+        DataConnectUntypedData,
+        serializer(),
+      )
+    val queryResult = queryRef.execute()
+    queryResult.data.asClue {
+      it.data.shouldNotBeNull()
+      it.data shouldBe
+        mapOf(
+          "items" to listOf(mapOf("id" to id, "value" to expectedAnyScalarRoundTripValue(value)))
+        )
+      it.errors.shouldBeEmpty()
+    }
+  }
+
+  @Test
+  fun queryNullValueForNullableAnyVariableShouldSucceed() = runTest {
+    // TODO: factor this out to a reuable method
+    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
+    val id = UUIDSerializer.serialize(key.id)
+
+    val queryVariables = DataConnectUntypedVariables("id" to id, "value" to null)
+    val queryRef =
+      dataConnect.query(
+        operationName = "GetFromNullableAnyScalarByIdAndValue",
+        variables = queryVariables,
+        DataConnectUntypedData,
+        DataConnectUntypedVariables,
+      )
+    val queryResult = queryRef.execute()
+    queryResult.data.asClue {
+      it.data.shouldNotBeNull()
+      it.data shouldBe mapOf("items" to listOf(mapOf("id" to id, "value" to null)))
+      it.errors.shouldBeEmpty()
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,11 +247,11 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nullableListOfNullableAnyEdgeCasesRoundTrip() = runTest {
     assertSoftly {
-      for (value in listEdgeCases) {
+      for (value in EdgeCases.lists) {
         withClue("value=$value") {
-          val id = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
-          verifyQueryResult("GetFromAnyScalarNullableListNullableById", id, expectedQueryResult)
+          val key = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", value)
+          val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+          verifyQueryResult("GetFromAnyScalarNullableListNullableById", key, expectedQueryResult)
         }
       }
     }
@@ -160,23 +259,23 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nullableListOfNullableAnyNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
-      val id = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromAnyScalarNullableListNullableById", id, expectedQueryResult)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
+      val key = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", value)
+      val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+      verifyQueryResult("GetFromAnyScalarNullableListNullableById", key, expectedQueryResult)
     }
   }
 
   @Test
   fun mutationMissingNullableListOfNullableAnyVariableShouldUseNull() = runTest {
-    val id = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", EmptyVariables).key.id
-    verifyQueryResult("GetFromAnyScalarNullableListNullableById", id, null)
+    val key = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", EmptyVariables)
+    verifyQueryResult("GetFromAnyScalarNullableListNullableById", key, null)
   }
 
   @Test
   fun mutationNullForNullableListOfNullableAnyVariableShouldBeSetToNull() = runTest {
-    val id = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", null).key.id
-    verifyQueryResult("GetFromAnyScalarNullableListNullableById", id, null)
+    val key = executeInsertMutation("InsertIntoAnyScalarNullableListNullable", null)
+    verifyQueryResult("GetFromAnyScalarNullableListNullableById", key, null)
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,14 +288,13 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nonNullableListOfNullableAnyEdgeCasesRoundTrip() = runTest {
     assertSoftly {
-      for (value in listEdgeCases) {
+      for (value in EdgeCases.lists) {
         withClue("value=$value") {
-          val id =
-            executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNullable", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
+          val key = executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNullable", value)
+          val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
           verifyQueryResult(
             "GetFromAnyScalarNonNullableListOfNullableById",
-            id,
+            key,
             expectedQueryResult
           )
         }
@@ -206,21 +304,21 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nonNullableListOfNullableAnyNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
-      val id = executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNullable", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromAnyScalarNonNullableListOfNullableById", id, expectedQueryResult)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
+      val key = executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNullable", value)
+      val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+      verifyQueryResult("GetFromAnyScalarNonNullableListOfNullableById", key, expectedQueryResult)
     }
   }
 
   @Test
   fun mutationMissingNonNullableListOfNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoAnyScalarNonNullableListOfNullable", EmptyVariables)
+    verifyMutationWithMissingAnyVariableFails("InsertIntoAnyScalarNonNullableListOfNullable")
   }
 
   @Test
   fun mutationNullValueForNonNullableListOfNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoAnyScalarNonNullableListOfNullable", null)
+    verifyMutationWithNullVariableValueFails("InsertIntoAnyScalarNonNullableListOfNullable")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,14 +331,13 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nullableListOfNonNullableAnyEdgeCasesRoundTrip() = runTest {
     assertSoftly {
-      for (value in listEdgeCases) {
+      for (value in EdgeCases.lists) {
         withClue("value=$value") {
-          val id =
-            executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
+          val key = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", value)
+          val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
           verifyQueryResult(
             "GetFromAnyScalarNullableListOfNonNullableById",
-            id,
+            key,
             expectedQueryResult
           )
         }
@@ -250,24 +347,23 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nullableListOfNonNullableAnyNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
-      val id = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", id, expectedQueryResult)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
+      val key = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", value)
+      val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+      verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", key, expectedQueryResult)
     }
   }
 
   @Test
   fun mutationMissingNullableListOfNonNullableAnyVariableShouldUseNull() = runTest {
-    val id =
-      executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", EmptyVariables).key.id
-    verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", id, null)
+    val key = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", EmptyVariables)
+    verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", key, null)
   }
 
   @Test
   fun mutationNullForNullableListOfNonNullableAnyVariableShouldBeSetToNull() = runTest {
-    val id = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", null).key.id
-    verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", id, null)
+    val key = executeInsertMutation("InsertIntoAnyScalarNullableListOfNonNullable", null)
+    verifyQueryResult("GetFromAnyScalarNullableListOfNonNullableById", key, null)
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -280,14 +376,13 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nonNullableListOfNonNullableAnyEdgeCasesRoundTrip() = runTest {
     assertSoftly {
-      for (value in listEdgeCases) {
+      for (value in EdgeCases.lists) {
         withClue("value=$value") {
-          val id =
-            executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNonNullable", value).key.id
-          val expectedQueryResult = expectedRoundTripValue(value)
+          val key = executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNonNullable", value)
+          val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
           verifyQueryResult(
             "GetFromAnyScalarNonNullableListOfNonNullableById",
-            id,
+            key,
             expectedQueryResult
           )
         }
@@ -297,22 +392,25 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nonNullableListOfNonNullableAnyNormalCasesRoundTrip() = runTest {
-    checkAll(20, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
-      val id =
-        executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNonNullable", value).key.id
-      val expectedQueryResult = expectedRoundTripValue(value)
-      verifyQueryResult("GetFromAnyScalarNonNullableListOfNonNullableById", id, expectedQueryResult)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterIsInstance<Any?, List<*>>()) { value ->
+      val key = executeInsertMutation("InsertIntoAnyScalarNonNullableListOfNonNullable", value)
+      val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+      verifyQueryResult(
+        "GetFromAnyScalarNonNullableListOfNonNullableById",
+        key,
+        expectedQueryResult
+      )
     }
   }
 
   @Test
   fun mutationMissingNonNullableListOfNonNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoAnyScalarNonNullableListOfNonNullable", null)
+    verifyMutationWithMissingAnyVariableFails("InsertIntoAnyScalarNonNullableListOfNonNullable")
   }
 
   @Test
   fun mutationNullForNonNullableListOfNonNullableAnyVariableShouldFail() = runTest {
-    verifyInsertMutationFails("InsertIntoAnyScalarNonNullableListOfNonNullable", EmptyVariables)
+    verifyMutationWithNullVariableValueFails("InsertIntoAnyScalarNonNullableListOfNonNullable")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -321,7 +419,73 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   object EmptyVariables
 
-  private inline fun <reified Data> mutationRefForInsertMutation(
+  /**
+   * Verifies that a value used as an `Any` scalar specified as a variable to a mutation is handled
+   * correctly. This is done by specifying the `Any` scalar value as a variable to a mutation that
+   * inserts a row into a table, followed by querying that row by its key to ensure that an equal
+   * `Any` value comes back from the query.
+   *
+   * @param value The value of the `Any` scalar to use; must be `null`, a [Boolean], [String],
+   * [Double], or a [Map], or [List] composed of these types.
+   * @param insertMutationName The operation name of a GraphQL mutation that takes a single variable
+   * named "value" of type `Any` or `[Any]`, with any nullability; this mutation must insert a row
+   * into a table and return a key for that row, where the key is a single "id" of type `UUID`.
+   * @param getByKeyQueryName The operation name of a GraphQL query that takes a single variable
+   * named "key" whose value is the key type returned from the `insertMutationName` mutation; its
+   * selection set must have a single field named "item" whose value is the `Any` value specified to
+   * the `insertMutationName` mutation.
+   */
+  private suspend fun verifyAnyScalarRoundTrip(
+    value: Any?,
+    insertMutationName: String,
+    getByKeyQueryName: String,
+  ) {
+    val key = executeInsertMutation(insertMutationName, value)
+    val expectedQueryResult = expectedAnyScalarRoundTripValue(value)
+    verifyQueryResult2(getByKeyQueryName, key, expectedQueryResult)
+  }
+
+  private suspend fun verifyAnyScalarQueryVariable(
+    value: Any?,
+    value2: Any?,
+    value3: Any?,
+    insert3MutationName: String,
+    getAllByTagAndValueQueryName: String,
+  ) {
+    require(value != value2)
+    require(value != value3)
+    require(expectedAnyScalarRoundTripValue(value) != expectedAnyScalarRoundTripValue(value2))
+    require(expectedAnyScalarRoundTripValue(value) != expectedAnyScalarRoundTripValue(value3))
+
+    @Serializable
+    data class InsertData(val key1: TestTableKey, val key2: TestTableKey, val key3: TestTableKey)
+    val tag = UUID.randomUUID().toString()
+    val insert3MutationVariables =
+      mapOf(
+        "tag" to tag,
+        "value1" to value,
+        "value2" to value2,
+        "value3" to value3,
+      )
+    val mutationRef =
+      mutationRefForVariables(
+        insert3MutationName,
+        insert3MutationVariables,
+        serializer<InsertData>()
+      )
+    val mutationResult = mutationRef.execute()
+    val key = mutationResult.data.key1
+
+    @Serializable data class QueryItem(val id: UUID)
+    @Serializable data class QueryData(val items: List<QueryItem>)
+    val queryVariables = mapOf("tag" to tag, "value" to value)
+    val queryRef =
+      queryRefForVariables(getAllByTagAndValueQueryName, queryVariables, serializer<QueryData>())
+    val queryResult = queryRef.execute()
+    queryResult.data.asClue { it.items.map { it.id } shouldContainExactly listOf(key.id) }
+  }
+
+  private inline fun <reified Data> mutationRefForVariables(
     operationName: String,
     variables: Map<String, Any?>,
     dataDeserializer: DeserializationStrategy<Data>,
@@ -333,69 +497,109 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
       DataConnectUntypedVariables,
     )
 
-  private inline fun <reified Data> mutationRefForInsertMutation(
+  private inline fun <reified Data> queryRefForVariables(
+    operationName: String,
+    variables: Map<String, Any?>,
+    dataDeserializer: DeserializationStrategy<Data>,
+  ): QueryRef<Data, DataConnectUntypedVariables> =
+    dataConnect.query(
+      operationName = operationName,
+      variables = DataConnectUntypedVariables(variables),
+      dataDeserializer,
+      DataConnectUntypedVariables,
+    )
+
+  private inline fun <reified Data> mutationRefForVariable(
     operationName: String,
     variable: Any?,
     dataDeserializer: DeserializationStrategy<Data>,
   ): MutationRef<Data, DataConnectUntypedVariables> =
-    mutationRefForInsertMutation(operationName, mapOf("value" to variable), dataDeserializer)
+    mutationRefForVariables(operationName, mapOf("value" to variable), dataDeserializer)
 
-  private suspend fun verifyInsertMutationFails(
+  private inline fun <reified Data> queryRefForVariable(
     operationName: String,
-    @Suppress("UNUSED_PARAMETER") variable: Nothing?,
-  ) {
-    val mutationRef = mutationRefForInsertMutation(operationName, null, DataConnectUntypedData)
-    val mutationResult = mutationRef.execute()
-    mutationResult.data.asClue {
+    variable: Any?,
+    dataDeserializer: DeserializationStrategy<Data>,
+  ): QueryRef<Data, DataConnectUntypedVariables> =
+    queryRefForVariables(operationName, mapOf("value" to variable), dataDeserializer)
+
+  private suspend fun verifyMutationWithNullVariableValueFails(operationName: String) {
+    val mutationRef = mutationRefForVariable(operationName, null, DataConnectUntypedData)
+    mutationRef.verifyExecuteFailsDueToNullVariable()
+  }
+
+  private suspend fun verifyQueryWithNullVariableValueFails(operationName: String) {
+    val queryRef = queryRefForVariable(operationName, null, DataConnectUntypedData)
+    queryRef.verifyExecuteFailsDueToNullVariable()
+  }
+
+  private suspend fun OperationRef<DataConnectUntypedData, *>
+    .verifyExecuteFailsDueToNullVariable() {
+    val result = execute()
+    result.data.asClue {
       it.data.shouldBeNull()
       it.errors.shouldHaveAtLeastSize(1)
+      it.errors[0].message shouldContainIgnoringCase "\$value is null"
     }
   }
 
-  private suspend fun verifyInsertMutationFails(
-    operationName: String,
-    @Suppress("UNUSED_PARAMETER") variables: EmptyVariables,
-  ) {
-    val mutationRef =
-      mutationRefForInsertMutation(operationName, emptyMap(), DataConnectUntypedData)
-    val mutationResult = mutationRef.execute()
-    mutationResult.data.asClue {
+  private suspend fun verifyMutationWithMissingAnyVariableFails(operationName: String) {
+    val variables: Map<String, Any?> = emptyMap()
+    val mutationRef = mutationRefForVariables(operationName, variables, DataConnectUntypedData)
+    mutationRef.verifyExecuteFailsDueToMissingVariable()
+  }
+
+  private suspend fun verifyQueryWithMissingAnyVariableFails(operationName: String) {
+    val variables: Map<String, Any?> = emptyMap()
+    val queryRef = queryRefForVariables(operationName, variables, DataConnectUntypedData)
+    queryRef.verifyExecuteFailsDueToMissingVariable()
+  }
+
+  private suspend fun OperationRef<DataConnectUntypedData, *>
+    .verifyExecuteFailsDueToMissingVariable() {
+    val result = execute()
+    result.data.asClue {
       it.data.shouldBeNull()
       it.errors.shouldHaveAtLeastSize(1)
+      it.errors[0].message shouldContainIgnoringCase "\$value is missing"
     }
   }
 
   private suspend fun executeInsertMutation(
     operationName: String,
     variable: Any?,
-  ): IdMutationData {
+  ): TestTableKey {
     val mutationRef =
-      mutationRefForInsertMutation<IdMutationData>(
+      mutationRefForVariable<IdMutationData>(
         operationName,
         variable,
         dataDeserializer = serializer(),
       )
-    return mutationRef.execute().data
+    return mutationRef.execute().data.key
   }
 
   private suspend fun executeInsertMutation(
     operationName: String,
     @Suppress("UNUSED_PARAMETER") variables: EmptyVariables,
-  ): IdMutationData {
+  ): TestTableKey {
     val mutationRef =
-      mutationRefForInsertMutation<IdMutationData>(
+      mutationRefForVariables<IdMutationData>(
         operationName,
         emptyMap(),
         dataDeserializer = serializer(),
       )
-    return mutationRef.execute().data
+    return mutationRef.execute().data.key
   }
 
-  private suspend fun verifyQueryResult(operationName: String, id: String, expectedData: Any?) {
+  private suspend fun verifyQueryResult(
+    operationName: String,
+    key: TestTableKey,
+    expectedData: Any?
+  ) {
     val queryRef =
       dataConnect.query(
         operationName = operationName,
-        variables = IdQueryVariables(id),
+        variables = IdQueryVariables(key.id),
         DataConnectUntypedData,
         serializer(),
       )
@@ -407,124 +611,61 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
     }
   }
 
-  @Serializable
-  data class IdMutationData(val key: Key) {
-    @Serializable data class Key(val id: String)
+  private suspend fun verifyQueryResult2(
+    operationName: String,
+    key: TestTableKey,
+    expectedData: Any?
+  ) {
+    val queryRef =
+      dataConnect.query(
+        operationName = operationName,
+        variables = QueryByKeyVariables(key),
+        DataConnectUntypedData,
+        serializer(),
+      )
+    val queryResult = queryRef.execute()
+    queryResult.data.asClue {
+      it.data.shouldNotBeNull()
+      it.data shouldBe mapOf("item" to mapOf("value" to expectedData))
+      it.errors.shouldBeEmpty()
+    }
   }
 
-  @Serializable data class IdQueryVariables(val id: String)
-
-  companion object {
-
-    val numberEdgeCases: List<Double> =
-      listOf(
-        -1.0,
-        -Double.MIN_VALUE,
-        -0.0,
-        0.0,
-        Double.MIN_VALUE,
-        1.0,
-        Double.NEGATIVE_INFINITY,
-        Double.NaN,
-        Double.POSITIVE_INFINITY
+  private suspend fun verifyAnyScalarQueryVariable(
+    key: TestTableKey,
+    queryByKeyAndValueOperationName: String,
+    variableValue: Any?,
+    expectedQueryFieldValue: Any?,
+  ) {
+    val id = UUIDSerializer.serialize(key.id)
+    val variables = DataConnectUntypedVariables("id" to id, "value" to variableValue)
+    val queryRef =
+      dataConnect.query(
+        operationName = queryByKeyAndValueOperationName,
+        variables = variables,
+        DataConnectUntypedData,
+        DataConnectUntypedVariables,
       )
-
-    val stringEdgeCases: List<String> = listOf("")
-
-    val booleanEdgeCases: List<Boolean> = listOf(true, false)
-
-    val primitiveEdgeCases = numberEdgeCases + stringEdgeCases + booleanEdgeCases
-
-    val listEdgeCases: List<List<Any?>> = buildList {
-      add(emptyList())
-      add(listOf(null))
-      add(listOf(emptyList<Nothing>()))
-      add(listOf(emptyMap<Nothing, Nothing>()))
-      add(listOf(listOf(null)))
-      add(listOf(mapOf("bansj8ayck" to emptyList<Nothing>())))
-      add(listOf(mapOf("mjstqe4bt4" to listOf(null))))
-      for (primitiveEdgeCase in primitiveEdgeCases) {
-        add(listOf(primitiveEdgeCase))
-        add(listOf(listOf(primitiveEdgeCase)))
-        add(listOf(mapOf("me74x5fqgy" to listOf(primitiveEdgeCase))))
-        add(listOf(mapOf("v2rj5cmhsm" to listOf(listOf(primitiveEdgeCase)))))
-      }
+    val queryResult = queryRef.execute()
+    queryResult.data.asClue {
+      it.data.shouldNotBeNull()
+      it.data shouldBe
+        mapOf("items" to listOf(mapOf("id" to id, "value" to expectedQueryFieldValue)))
+      it.errors.shouldBeEmpty()
     }
+  }
 
-    val mapEdgeCases: List<Map<String, Any?>> = buildList {
-      add(emptyMap())
-      add(mapOf("" to null))
-      add(mapOf("fzjfmcrqwe" to emptyMap<Nothing, Nothing>()))
-      add(mapOf("g3a2sgytnd" to emptyList<Nothing>()))
-      add(mapOf("qywfwqnb6p" to mapOf("84gszc54nh" to null)))
-      add(mapOf("zeb85c3xbr" to mapOf("t6mzt385km" to emptyMap<Nothing, Nothing>())))
-      add(mapOf("ew85krxvmv" to mapOf("w8a2myv5yj" to emptyList<Nothing>())))
-      for (primitiveEdgeCase in primitiveEdgeCases) {
-        add(mapOf("yq7j7n72tc" to primitiveEdgeCase))
-        add(mapOf("qsdbfeygnf" to mapOf("33rsz2mjpr" to primitiveEdgeCase)))
-        add(mapOf("kyjkx5epga" to listOf(primitiveEdgeCase)))
-      }
-    }
+  @Serializable data class TestTableKey(val id: UUID)
 
-    val anyScalarEdgeCases: List<Any?> =
-      numberEdgeCases +
-        stringEdgeCases +
-        booleanEdgeCases +
-        listEdgeCases +
-        mapEdgeCases +
-        listOf(null)
+  @Serializable private data class IdMutationData(val key: TestTableKey)
 
-    fun Arb.Companion.anyScalar(): Arb<Any?> = arbitrary {
-      val booleans = Arb.boolean()
-      val numbers = Arb.double()
-      val nulls = Arb.of(null)
+  @Serializable private data class IdQueryVariables(val id: UUID)
 
-      val codepoints =
-        Codepoint.ascii()
-          .merge(Codepoint.egyptianHieroglyphs())
-          .merge(Codepoint.arabic())
-          .merge(Codepoint.cyrillic())
-          // Do not produce character code 0 because it's not supported by Postgresql:
-          // https://www.postgresql.org/docs/current/datatype-character.html
-          .filterNot { it.value == 0 }
-      val strings = Arb.string(minSize = 1, maxSize = 40, codepoints = codepoints)
+  @Serializable private data class QueryByKeyVariables(val key: TestTableKey)
 
-      // Define `values` here so that it can be referenced by `lists` and `maps`; its value will
-      // be re-assigned later, as a workaround for a circular reference.
-      var values: Arb<Any?> = Arb.string()
+  private companion object {
 
-      val lists: Arb<List<Any?>> = arbitrary {
-        val size = Arb.int(1..3).bind()
-        List(size) { values.bind() }
-      }
-
-      val maps: Arb<Map<String, Any?>> = arbitrary {
-        buildMap {
-          val size = Arb.int(1..3).bind()
-          repeat(size) {
-            val key = strings.bind()
-            val value = values.bind()
-            put(key, value)
-          }
-        }
-      }
-
-      // Re-assign `values` here so that `list` and `map` can recursively call themselves.
-      values = Arb.choice(booleans, numbers, strings, nulls, lists, maps)
-
-      values.bind()
-    }
-
-    fun expectedRoundTripValue(value: Any?): Any? =
-      when (value) {
-        null -> null
-        -0.0 -> 0.0
-        Double.NaN -> "NaN"
-        Double.POSITIVE_INFINITY -> "Infinity"
-        Double.NEGATIVE_INFINITY -> "-Infinity"
-        is List<*> -> value.map { expectedRoundTripValue(it) }
-        is Map<*, *> -> value.mapValues { expectedRoundTripValue(it.value) }
-        else -> value
-      }
+    val normalCasePropTestConfig =
+      PropTestConfig(iterations = 20, edgeConfig = EdgeConfig(edgecasesGenerationProbability = 0.0))
   }
 }

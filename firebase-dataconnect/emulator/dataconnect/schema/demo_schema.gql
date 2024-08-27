@@ -301,3 +301,29 @@ type NullableTimestampsWithDefaults @table {
   requestTime1: Timestamp @default(expr: "request.time")
   requestTime2: Timestamp @default(expr: "request.time")
 }
+
+type NonNullableAnyScalar @table {
+  value: Any!
+  tag: String
+}
+
+type NullableAnyScalar @table {
+  value: Any
+  cookie: String
+}
+
+type AnyScalarNullableListNullable @table {
+  value: [Any]
+}
+
+type AnyScalarNonNullableListOfNullable @table {
+  value: [Any]!
+}
+
+type AnyScalarNullableListOfNonNullable @table {
+  value: [Any!]
+}
+
+type AnyScalarNonNullableListOfNonNullable @table {
+  value: [Any!]!
+}

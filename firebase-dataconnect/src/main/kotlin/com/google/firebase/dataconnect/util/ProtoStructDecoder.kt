@@ -18,6 +18,8 @@
 
 package com.google.firebase.dataconnect.util
 
+import com.google.firebase.dataconnect.AnyValue
+import com.google.firebase.dataconnect.serializers.AnyValueSerializer
 import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
@@ -41,17 +43,6 @@ internal fun <T> decodeFromStruct(deserializer: DeserializationStrategy<T>, stru
   val protoValue = Value.newBuilder().setStructValue(struct).build()
   return ProtoValueDecoder(protoValue, path = null).decodeSerializableValue(deserializer)
 }
-
-private fun Value.toAny(): Any? =
-  when (kindCase) {
-    KindCase.BOOL_VALUE -> boolValue
-    KindCase.NUMBER_VALUE -> numberValue
-    KindCase.STRING_VALUE -> stringValue
-    KindCase.LIST_VALUE -> listValue.valuesList
-    KindCase.STRUCT_VALUE -> structValue.fieldsMap
-    KindCase.NULL_VALUE -> null
-    else -> "ERROR: unsupported kindCase: $kindCase"
-  }
 
 private fun <T> Value.decode(path: String?, expectedKindCase: KindCase, block: (Value) -> T): T =
   if (kindCase != expectedKindCase) {
@@ -102,7 +93,7 @@ private fun Value.decodeLong(path: String?): Long =
 private fun Value.decodeShort(path: String?): Short =
   decode(path, KindCase.NUMBER_VALUE) { it.numberValue.toInt().toShort() }
 
-private class ProtoValueDecoder(private val valueProto: Value, private val path: String?) :
+internal class ProtoValueDecoder(internal val valueProto: Value, private val path: String?) :
   Decoder {
 
   override val serializersModule = EmptySerializersModule()
@@ -236,7 +227,16 @@ private class ProtoStructValueDecoder(private val struct: Struct, private val pa
         ?: if (elementKind is StructureKind.OBJECT) Value.getDefaultInstance()
         else throw SerializationException("element \"$elementPath\" missing; expected $elementKind")
 
-    return deserializer.deserialize(ProtoValueDecoder(valueProto, elementPath))
+    return when (deserializer) {
+      is AnyValueSerializer -> {
+        @Suppress("UNCHECKED_CAST")
+        AnyValue(valueProto) as T
+      }
+      else -> {
+        val protoValueDecoder = ProtoValueDecoder(valueProto, elementPath)
+        deserializer.deserialize(protoValueDecoder)
+      }
+    }
   }
 
   @ExperimentalSerializationApi

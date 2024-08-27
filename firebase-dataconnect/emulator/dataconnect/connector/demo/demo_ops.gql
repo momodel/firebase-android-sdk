@@ -1257,3 +1257,73 @@ query GetNullableTimestampsWithDefaultsByKey($key: NullableTimestampsWithDefault
     requestTime2
   }
 }
+
+###############################################################################
+# Operations for table: NonNullableAnyScalar
+###############################################################################
+
+mutation NonNullableAnyScalarInsert($tag: String, $value: Any!) @auth(level: PUBLIC) {
+  key: nonNullableAnyScalar_insert(data: { tag: $tag, value: $value })
+}
+
+mutation NonNullableAnyScalarInsert3($tag: String, $value1: Any!, $value2: Any!, $value3: Any!,) @auth(level: PUBLIC) {
+  key1: nonNullableAnyScalar_insert(data: { value: $value1, tag: $tag })
+  key2: nonNullableAnyScalar_insert(data: { value: $value2, tag: $tag })
+  key3: nonNullableAnyScalar_insert(data: { value: $value3, tag: $tag })
+}
+
+query NonNullableAnyScalarGetByKey($key: NonNullableAnyScalar_Key!) @auth(level: PUBLIC) {
+  item: nonNullableAnyScalar(key: $key) { value }
+}
+
+query NonNullableAnyScalarGetAllByTagAndValue($tag: String, $value: Any!) @auth(level: PUBLIC) {
+  items: nonNullableAnyScalars(limit: 5, where: { value: { eq: $value }, tag: { eq: $tag } }) { id }
+}
+
+
+
+
+
+mutation InsertIntoNullableAnyScalar($value: Any, $cookie: String) @auth(level: PUBLIC) {
+  key: nullableAnyScalar_insert(data: { value: $value, cookie: $cookie })
+}
+
+query GetFromNullableAnyScalarByKey($key: NullableAnyScalar_Key!) @auth(level: PUBLIC) {
+  item: nullableAnyScalar(key: $key) { value }
+}
+
+query GetFromNullableAnyScalarByValueAndCookie($value: Any, $cookie: String) @auth(level: PUBLIC) {
+  items: nullableAnyScalars(where: { value: { eq: $value }, cookie: { eq: $cookie } }) { id, value }
+}
+
+mutation InsertIntoAnyScalarNullableListNullable($value: [Any!]) @auth(level: PUBLIC) {
+  key: anyScalarNullableListNullable_insert(data: { value: $value })
+}
+
+query GetFromAnyScalarNullableListNullableById($id: UUID!) @auth(level: PUBLIC) {
+  item: anyScalarNullableListNullable(id: $id) { value }
+}
+
+mutation InsertIntoAnyScalarNonNullableListOfNullable($value: [Any!]!) @auth(level: PUBLIC) {
+  key: anyScalarNonNullableListOfNullable_insert(data: { value: $value })
+}
+
+query GetFromAnyScalarNonNullableListOfNullableById($id: UUID!) @auth(level: PUBLIC) {
+  item: anyScalarNonNullableListOfNullable(id: $id) { value }
+}
+
+mutation InsertIntoAnyScalarNullableListOfNonNullable($value: [Any!]) @auth(level: PUBLIC) {
+  key: anyScalarNullableListOfNonNullable_insert(data: { value: $value })
+}
+
+query GetFromAnyScalarNullableListOfNonNullableById($id: UUID!) @auth(level: PUBLIC) {
+  item: anyScalarNullableListOfNonNullable(id: $id) { value }
+}
+
+mutation InsertIntoAnyScalarNonNullableListOfNonNullable($value: [Any!]!) @auth(level: PUBLIC) {
+  key: anyScalarNonNullableListOfNonNullable_insert(data: { value: $value })
+}
+
+query GetFromAnyScalarNonNullableListOfNonNullableById($id: UUID!) @auth(level: PUBLIC) {
+  item: anyScalarNonNullableListOfNonNullable(id: $id) { value }
+}

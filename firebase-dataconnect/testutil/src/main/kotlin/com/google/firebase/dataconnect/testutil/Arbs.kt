@@ -20,9 +20,22 @@ import com.google.firebase.dataconnect.ConnectorConfig
 import com.google.firebase.dataconnect.DataConnectSettings
 import com.google.firebase.util.nextAlphanumericString
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.Codepoint
+import io.kotest.property.arbitrary.arabic
 import io.kotest.property.arbitrary.arbitrary
+import io.kotest.property.arbitrary.ascii
 import io.kotest.property.arbitrary.boolean
+import io.kotest.property.arbitrary.choice
+import io.kotest.property.arbitrary.cyrillic
+import io.kotest.property.arbitrary.double
+import io.kotest.property.arbitrary.egyptianHieroglyphs
+import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.filterNot
+import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.merge
 import io.kotest.property.arbitrary.next
+import io.kotest.property.arbitrary.of
+import io.kotest.property.arbitrary.string
 
 fun Arb.Companion.keyedString(id: String, key: String, length: Int = 8): Arb<String> =
   arbitrary { rs ->
@@ -66,3 +79,46 @@ fun Arb.Companion.dataConnectSettings(
 ): Arb<DataConnectSettings> = arbitrary { rs ->
   DataConnectSettings(host = host.next(rs), sslEnabled = sslEnabled.next(rs))
 }
+
+fun Arb.Companion.anyScalar(): Arb<Any?> =
+  arbitrary(edgecases = EdgeCases.anyScalars) {
+    // Put the arbs into an `object` so that `lists`, `maps`, and `allValues` can contain
+    // circular references to each other.
+    val anyScalarArbs =
+      object {
+        val booleans = Arb.boolean()
+        val numbers = Arb.double()
+        val nulls = Arb.of(null)
+
+        val codepoints =
+          Codepoint.ascii()
+            .merge(Codepoint.egyptianHieroglyphs())
+            .merge(Codepoint.arabic())
+            .merge(Codepoint.cyrillic())
+            // Do not produce character code 0 because it's not supported by Postgresql:
+            // https://www.postgresql.org/docs/current/datatype-character.html
+            .filterNot { it.value == 0 }
+        val strings = Arb.string(minSize = 1, maxSize = 40, codepoints = codepoints)
+
+        val lists: Arb<List<Any?>> = arbitrary {
+          val size = Arb.int(1..3).bind()
+          List(size) { allValues.bind() }
+        }
+
+        val maps: Arb<Map<String, Any?>> = arbitrary {
+          buildMap {
+            val size = Arb.int(1..3).bind()
+            repeat(size) { put(strings.bind(), allValues.bind()) }
+          }
+        }
+
+        val allValues: Arb<Any?> = Arb.choice(booleans, numbers, strings, nulls, lists, maps)
+      }
+
+    anyScalarArbs.allValues.bind()
+  }
+
+fun Arb.Companion.anyScalarNotMatching(value: Any?) =
+  anyScalar().filter {
+    it != value && expectedAnyScalarRoundTripValue(it) != expectedAnyScalarRoundTripValue(value)
+  }

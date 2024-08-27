@@ -18,6 +18,8 @@
 
 package com.google.firebase.dataconnect.util
 
+import com.google.firebase.dataconnect.AnyValue
+import com.google.firebase.dataconnect.serializers.AnyValueSerializer
 import com.google.protobuf.ListValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
@@ -51,7 +53,7 @@ internal fun <T> encodeToStruct(serializer: SerializationStrategy<T>, value: T):
   return valueProto.structValue
 }
 
-private class ProtoValueEncoder(private val path: String?, private val onValue: (Value) -> Unit) :
+internal class ProtoValueEncoder(private val path: String?, val onValue: (Value) -> Unit) :
   Encoder {
 
   override val serializersModule = EmptySerializersModule()
@@ -115,6 +117,16 @@ private class ProtoValueEncoder(private val path: String?, private val onValue: 
 
   override fun encodeString(value: String) {
     onValue(value.toValueProto())
+  }
+
+  override fun <T : Any?> encodeSerializableValue(serializer: SerializationStrategy<T>, value: T) {
+    when (serializer) {
+      is AnyValueSerializer -> {
+        val anyValue = value as AnyValue
+        onValue(anyValue.protoValue)
+      }
+      else -> super.encodeSerializableValue(serializer, value)
+    }
   }
 }
 
