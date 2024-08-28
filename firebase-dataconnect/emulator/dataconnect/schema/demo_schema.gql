@@ -305,11 +305,13 @@ type NullableTimestampsWithDefaults @table {
 type NonNullableAnyScalar @table {
   value: Any!
   tag: String
+  position: Int
 }
 
 type NullableAnyScalar @table {
   value: Any
   tag: String
+  position: Int
 }
 
 type AnyScalarNullableListNullable @table {

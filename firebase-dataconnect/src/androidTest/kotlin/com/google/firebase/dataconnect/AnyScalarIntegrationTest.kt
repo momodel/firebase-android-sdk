@@ -217,24 +217,29 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsMissing() = runTest {
-    // TODO: factor this out to a reuable method
-    val value = Arb.anyScalar().next()
-    val key = executeInsertMutation("NullableAnyScalarInsert", value)
-    val id = UUIDSerializer.serialize(key.id)
+    // TODO: factor this out to a reusable method
+    val values = List(3) { Arb.anyScalar().next() }
+    val tag = UUID.randomUUID().toString()
+    val keys =
+      executeInsert3Mutation("NullableAnyScalarInsert3", tag, values[0], values[1], values[2])
 
     val queryRef =
       dataConnect.query(
         operationName = "NullableAnyScalarGetAllByTagAndValue",
-        variables = IdQueryVariables(key.id),
-        DataConnectUntypedData,
-        serializer(),
+        variables = DataConnectUntypedVariables("tag" to tag),
+        dataDeserializer = DataConnectUntypedData,
+        variablesSerializer = DataConnectUntypedVariables,
       )
     val queryResult = queryRef.execute()
     queryResult.data.asClue {
-      it.data.shouldNotBeNull()
       it.data shouldBe
         mapOf(
-          "items" to listOf(mapOf("id" to id, "value" to expectedAnyScalarRoundTripValue(value)))
+          "items" to
+            listOf(
+              mapOf("id" to keys.key1.id),
+              mapOf("id" to keys.key2.id),
+              mapOf("id" to keys.key3.id)
+            )
         )
       it.errors.shouldBeEmpty()
     }
@@ -250,22 +255,21 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsNull() = runTest {
-    // TODO: factor this out to a reuable method
-    val key = executeInsertMutation("NullableAnyScalarInsert", null)
-    val id = UUIDSerializer.serialize(key.id)
+    // TODO: factor this out to a reusable method
+    val values = List(2) { Arb.anyScalar().filter { it !== null }.next() }
+    val tag = UUID.randomUUID().toString()
+    val keys = executeInsert3Mutation("NullableAnyScalarInsert3", tag, null, values[0], values[1])
 
-    val queryVariables = DataConnectUntypedVariables("id" to id, "value" to null)
     val queryRef =
       dataConnect.query(
         operationName = "NullableAnyScalarGetAllByTagAndValue",
-        variables = queryVariables,
-        DataConnectUntypedData,
-        DataConnectUntypedVariables,
+        variables = DataConnectUntypedVariables("tag" to tag, "value" to null),
+        dataDeserializer = DataConnectUntypedData,
+        variablesSerializer = DataConnectUntypedVariables,
       )
     val queryResult = queryRef.execute()
     queryResult.data.asClue {
-      it.data.shouldNotBeNull()
-      it.data shouldBe mapOf("items" to listOf(mapOf("id" to id, "value" to null)))
+      it.data shouldBe mapOf("items" to listOf(mapOf("id" to keys.key1.id)))
       it.errors.shouldBeEmpty()
     }
   }
@@ -614,12 +618,28 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
     }
   }
 
+  private suspend fun executeInsert3Mutation(
+    operationName: String,
+    tag: String,
+    value1: Any?,
+    value2: Any?,
+    value3: Any?,
+  ): Insert3MutationDataStrings {
+    val mutationRef =
+      mutationRefForVariables<Insert3MutationDataStrings>(
+        operationName,
+        variables = mapOf("tag" to tag, "value1" to value1, "value2" to value2, "value3" to value3),
+        dataDeserializer = serializer(),
+      )
+    return mutationRef.execute().data
+  }
+
   private suspend fun executeInsertMutation(
     operationName: String,
     variable: Any?,
   ): TestTableKey {
     val mutationRef =
-      mutationRefForVariable<IdMutationData>(
+      mutationRefForVariable<InsertMutationData>(
         operationName,
         variable,
         dataDeserializer = serializer(),
@@ -632,7 +652,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
     @Suppress("UNUSED_PARAMETER") variables: EmptyVariables,
   ): TestTableKey {
     val mutationRef =
-      mutationRefForVariables<IdMutationData>(
+      mutationRefForVariables<InsertMutationData>(
         operationName,
         emptyMap(),
         dataDeserializer = serializer(),
@@ -705,8 +725,16 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Serializable data class TestTableKey(val id: UUID)
+  @Serializable data class TestTableKeyString(val id: String)
 
-  @Serializable private data class IdMutationData(val key: TestTableKey)
+  @Serializable private data class InsertMutationData(val key: TestTableKey)
+
+  @Serializable
+  private data class Insert3MutationDataStrings(
+    val key1: TestTableKeyString,
+    val key2: TestTableKeyString,
+    val key3: TestTableKeyString
+  )
 
   @Serializable private data class IdQueryVariables(val id: UUID)
 
