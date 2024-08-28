@@ -43,7 +43,6 @@ import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.next
 import io.kotest.property.checkAll
 import java.util.UUID
-import kotlin.time.Duration
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
@@ -308,6 +307,34 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     queryResult.data shouldBe
       AnyScalarNullableGetAllByTagAndValueQuery.Data(
         listOf(AnyScalarNullableGetAllByTagAndValueQuery.Data.ItemsItem(key.id))
+      )
+  }
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  // Tests for inserting into and querying this table:
+  // type AnyScalarNullableListOfNullable @table { value: [Any], tag: String, position: Int }
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  @Test
+  fun anyScalarNullableListOfNullable_MutationVariableEdgeCases() = runTest {
+    assertSoftly {
+      withClue("value=null") { verifyAnyScalarNullableListOfNullableRoundTrip(null) }
+      val values = EdgeCases.anyScalars.filterIsInstance<List<Any?>>().map { it.filterNotNull() }
+      for (value in values) {
+        withClue("value=$value") { verifyAnyScalarNullableListOfNullableRoundTrip(value) }
+      }
+    }
+  }
+
+  private suspend fun verifyAnyScalarNullableListOfNullableRoundTrip(value: List<Any>?) {
+    val anyValue = value?.map { AnyValue.fromAny(it) }
+    val expectedQueryResult = value?.map { AnyValue.fromAny(expectedAnyScalarRoundTripValue(it)) }
+    val key =
+      connector.anyScalarNullableListOfNullableInsert.execute { this.value = anyValue }.data.key
+
+    val queryResult = connector.anyScalarNullableListOfNullableGetByKey.execute(key)
+    queryResult.data shouldBe
+      AnyScalarNullableListOfNullableGetByKeyQuery.Data(
+        AnyScalarNullableListOfNullableGetByKeyQuery.Data.Item(expectedQueryResult)
       )
   }
 

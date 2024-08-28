@@ -314,11 +314,16 @@ private class ProtoListValueDecoder(private val list: ListValue, private val pat
     deserializer: DeserializationStrategy<T>,
     previousValue: T?
   ): T =
-    if (previousValue !== null) previousValue
-    else
+    if (previousValue !== null) {
+      previousValue
+    } else if (deserializer is AnyValueSerializer) {
+      @Suppress("UNCHECKED_CAST")
+      AnyValue(list.valuesList[index]) as T
+    } else {
       deserializer.deserialize(
         ProtoValueDecoder(list.valuesList[index], elementPathForIndex(index))
       )
+    }
 
   @ExperimentalSerializationApi
   override fun <T : Any> decodeNullableSerializableElement(
@@ -326,15 +331,14 @@ private class ProtoListValueDecoder(private val list: ListValue, private val pat
     index: Int,
     deserializer: DeserializationStrategy<T?>,
     previousValue: T?
-  ): T? {
-    return if (previousValue !== null) {
+  ): T? =
+    if (previousValue !== null) {
       previousValue
     } else if (list.valuesList[index].hasNullValue()) {
       null
     } else {
       decodeSerializableElement(descriptor, index, deserializer, previousValue = null)
     }
-  }
 
   private fun elementPathForIndex(index: Int) = if (path === null) "[$index]" else "${path}[$index]"
 }
