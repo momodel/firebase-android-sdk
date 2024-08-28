@@ -381,6 +381,113 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     }
   }
 
+  @Test
+  fun anyScalarNullableListOfNullable_MutationSucceedsIfAnyVariableIsMissing() = runTest {
+    val key = connector.anyScalarNullableListOfNullableInsert.execute {}.data.key
+    val queryResult = connector.anyScalarNullableListOfNullableGetByKey.execute(key)
+    queryResult.data.asClue { it.item?.value.shouldBeNull() }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_QuerySucceedsIfAnyVariableIsMissing() = runTest {
+    val values =
+      Arb.anyScalar()
+        .filterIsInstance<Any?, List<Any?>>()
+        .map { it.filterNotNull() }
+        .map { it.map(AnyValue::fromAny) }
+    val tag = UUID.randomUUID().toString()
+    val keys =
+      connector.anyScalarNullableListOfNullableInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = values.next()
+          this.value2 = values.next()
+          this.value3 = values.next()
+        }
+        .data
+
+    val queryResult =
+      connector.anyScalarNullableListOfNullableGetAllByTagAndValue.execute { this.tag = tag }
+    queryResult.data.asClue {
+      it shouldBe
+        AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data(
+          listOf(
+            AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(keys.key1.id),
+            AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(keys.key2.id),
+            AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(keys.key3.id),
+          )
+        )
+    }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_MutationSucceedsIfAnyVariableIsNull() = runTest {
+    val key = connector.anyScalarNullableListOfNullableInsert.execute { value = null }.data.key
+    val queryResult = connector.anyScalarNullableListOfNullableGetByKey.execute(key)
+    queryResult.data.asClue { it.item?.value.shouldBeNull() }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_QuerySucceedsIfAnyVariableIsNull() = runTest {
+    val values =
+      Arb.anyScalar()
+        .filterIsInstance<Any?, List<Any?>>()
+        .map { it.filterNotNull() }
+        .map { it.map(AnyValue::fromAny) }
+    val tag = UUID.randomUUID().toString()
+    connector.anyScalarNullableListOfNullableInsert3
+      .execute {
+        this.tag = tag
+        this.value1 = null
+        this.value2 = emptyList()
+        this.value3 = values.next()
+      }
+      .data
+
+    val queryResult =
+      connector.anyScalarNullableListOfNullableGetAllByTagAndValue.execute {
+        this.tag = tag
+        this.value = null
+      }
+    queryResult.data.asClue {
+      it shouldBe AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data(emptyList())
+    }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_QuerySucceedsIfAnyVariableIsEmpty() = runTest {
+    val values =
+      Arb.anyScalar()
+        .filterIsInstance<Any?, List<Any?>>()
+        .map { it.filterNotNull() }
+        .map { it.map(AnyValue::fromAny) }
+    val tag = UUID.randomUUID().toString()
+    val keys =
+      connector.anyScalarNullableListOfNullableInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = null
+          this.value2 = emptyList()
+          this.value3 = values.next()
+        }
+        .data
+
+    val queryResult =
+      connector.anyScalarNullableListOfNullableGetAllByTagAndValue.execute {
+        this.tag = tag
+        this.value = emptyList()
+      }
+    queryResult.data.asClue {
+      it shouldBe
+        AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data(
+          listOf(
+            AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(keys.key2.id),
+            AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(keys.key3.id),
+          )
+        )
+    }
+  }
+
   private suspend fun verifyAnyScalarNullableListOfNullableRoundTrip(value: List<Any>?) {
     val anyValue = value?.map { AnyValue.fromAny(it) }
     val expectedQueryResult = value?.map { AnyValue.fromAny(expectedAnyScalarRoundTripValue(it)) }
