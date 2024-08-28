@@ -24,22 +24,26 @@ import com.google.firebase.dataconnect.generated.GeneratedMutation
 import com.google.firebase.dataconnect.generated.GeneratedQuery
 import com.google.firebase.dataconnect.testutil.EdgeCases
 import com.google.firebase.dataconnect.testutil.anyScalar
-import com.google.firebase.dataconnect.testutil.anyScalarNotMatching
 import com.google.firebase.dataconnect.testutil.expectedAnyScalarRoundTripValue
+import com.google.firebase.dataconnect.testutil.filterNotAnyScalarMatching
+import com.google.firebase.dataconnect.testutil.filterNotNull
+import io.kotest.assertions.asClue
 import io.kotest.assertions.assertSoftly
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.common.ExperimentalKotest
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContainIgnoringCase
 import io.kotest.property.Arb
 import io.kotest.property.EdgeConfig
 import io.kotest.property.PropTestConfig
 import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.next
-import io.kotest.property.assume
 import io.kotest.property.checkAll
 import java.util.UUID
+import kotlin.time.Duration
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
@@ -65,9 +69,9 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
   fun nonNullableAnyScalar_QueryVariableEdgeCases() = runTest {
     assertSoftly {
       for (value in EdgeCases.anyScalars.filterNotNull()) {
-        val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
+        val otherValues = Arb.anyScalar().filterNotNull().filterNotAnyScalarMatching(value)
         withClue("value=$value otherValues=$otherValues") {
-          verifyNonNullableAnyScalarQueryVariable(value, otherValues[0], otherValues[1])
+          verifyNonNullableAnyScalarQueryVariable(value, otherValues.next(), otherValues.next())
         }
       }
     }
@@ -75,18 +79,16 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
 
   @Test
   fun nonNullableAnyScalar_MutationVariableNormalCases() = runTest {
-    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
-      assume(value !== null)
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterNotNull()) { value ->
       verifyNonNullableAnyScalarRoundTrip(value)
     }
   }
 
   @Test
   fun nonNullableAnyScalar_QueryVariableNormalCases() = runTest {
-    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
-      assume(value !== null)
-      val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
-      verifyNonNullableAnyScalarQueryVariable(value, otherValues[0], otherValues[1])
+    checkAll(normalCasePropTestConfig, Arb.anyScalar().filterNotNull()) { value ->
+      val otherValues = Arb.anyScalar().filterNotNull().filterNotAnyScalarMatching(value)
+      verifyNonNullableAnyScalarQueryVariable(value, otherValues.next(), otherValues.next())
     }
   }
 
@@ -110,7 +112,7 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     connector.nonNullableAnyScalarGetAllByTagAndValue.verifyFailsWithNullVariableValue()
   }
 
-  private suspend fun verifyNonNullableAnyScalarRoundTrip(value: Any?) {
+  private suspend fun verifyNonNullableAnyScalarRoundTrip(value: Any) {
     val anyValue = AnyValue.fromAny(value)
     val expectedQueryResult = AnyValue.fromAny(expectedAnyScalarRoundTripValue(value))
     val key = connector.nonNullableAnyScalarInsert.execute(anyValue) {}.data.key
@@ -123,9 +125,9 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
   }
 
   private suspend fun verifyNonNullableAnyScalarQueryVariable(
-    value: Any?,
-    value2: Any?,
-    value3: Any?
+    value: Any,
+    value2: Any,
+    value3: Any,
   ) {
     require(value != value2)
     require(value != value3)
@@ -147,6 +149,167 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     queryResult.data shouldBe
       NonNullableAnyScalarGetAllByTagAndValueQuery.Data(
         listOf(NonNullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(key.id))
+      )
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  // Tests for inserting into and querying this table:
+  // type NullableAnyScalar @table { value: Any, tag: String }
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  @Test fun foo() = runTest(timeout = Duration.INFINITE) { verifyNullableAnyScalarRoundTrip(null) }
+
+  @Test
+  fun nullableAnyScalar_MutationVariableEdgeCases() = runTest {
+    assertSoftly {
+      for (value in EdgeCases.anyScalars) {
+        withClue("value=$value") { verifyNullableAnyScalarRoundTrip(value) }
+      }
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_QueryVariableEdgeCases() = runTest {
+    assertSoftly {
+      for (value in EdgeCases.anyScalars) {
+        val otherValues = Arb.anyScalar().filterNotAnyScalarMatching(value)
+        withClue("value=$value otherValues=$otherValues") {
+          verifyNullableAnyScalarQueryVariable(value, otherValues.next(), otherValues.next())
+        }
+      }
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_MutationVariableNormalCases() = runTest {
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      verifyNullableAnyScalarRoundTrip(value)
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_QueryVariableNormalCases() = runTest {
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      val otherValues = Arb.anyScalar().filterNotAnyScalarMatching(value)
+      verifyNullableAnyScalarQueryVariable(value, otherValues.next(), otherValues.next())
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_MutationSucceedsIfAnyVariableIsMissing() = runTest {
+    val key = connector.nullableAnyScalarInsert.execute {}.data.key
+    val queryResult = connector.nullableAnyScalarGetByKey.execute(key)
+    queryResult.data.asClue { it.item?.value.shouldBeNull() }
+  }
+
+  @Test
+  fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsMissing() = runTest {
+    val values = Arb.anyScalar().map { AnyValue.fromAny(it) }
+    val tag = UUID.randomUUID().toString()
+    val keys =
+      connector.nullableAnyScalarInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = values.next()
+          this.value2 = values.next()
+          this.value3 = values.next()
+        }
+        .data
+
+    val queryResult = connector.nullableAnyScalarGetAllByTagAndValue.execute { this.tag = tag }
+    queryResult.data.asClue {
+      it shouldBe
+        NullableAnyScalarGetAllByTagAndValueQuery.Data(
+          listOf(
+            NullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(keys.key1.id),
+            NullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(keys.key2.id),
+            NullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(keys.key3.id),
+          )
+        )
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_MutationSucceedsIfAnyVariableIsNull() = runTest {
+    val key = connector.nullableAnyScalarInsert.execute { value = null }.data.key
+    val queryResult = connector.nullableAnyScalarGetByKey.execute(key)
+    queryResult.data.asClue { it.item?.value.shouldBeNull() }
+  }
+
+  @Test
+  fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsNull() = runTest {
+    val values = Arb.anyScalar().filter { it !== null }.map { AnyValue.fromAny(it) }
+    val tag = UUID.randomUUID().toString()
+    val keys =
+      connector.nullableAnyScalarInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = null
+          this.value2 = values.next()
+          this.value3 = values.next()
+        }
+        .data
+
+    val queryResult =
+      connector.nullableAnyScalarGetAllByTagAndValue.execute {
+        this.tag = tag
+        this.value = null
+      }
+    queryResult.data.asClue {
+      it shouldBe
+        NullableAnyScalarGetAllByTagAndValueQuery.Data(
+          listOf(
+            NullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(keys.key1.id),
+          )
+        )
+    }
+  }
+
+  private suspend fun verifyNullableAnyScalarRoundTrip(value: Any?) {
+    val anyValue = AnyValue.fromAny(value)
+    val expectedQueryResult = AnyValue.fromAny(expectedAnyScalarRoundTripValue(value))
+    val key = connector.nullableAnyScalarInsert.execute { this.value = anyValue }.data.key
+
+    val queryResult = connector.nullableAnyScalarGetByKey.execute(key)
+    queryResult.data shouldBe
+      NullableAnyScalarGetByKeyQuery.Data(
+        NullableAnyScalarGetByKeyQuery.Data.Item(expectedQueryResult)
+      )
+  }
+
+  private suspend fun verifyNullableAnyScalarQueryVariable(
+    value: Any?,
+    value2: Any?,
+    value3: Any?
+  ) {
+    require(value != value2)
+    require(value != value3)
+    require(expectedAnyScalarRoundTripValue(value) != expectedAnyScalarRoundTripValue(value2))
+    require(expectedAnyScalarRoundTripValue(value) != expectedAnyScalarRoundTripValue(value3))
+
+    val tag = UUID.randomUUID().toString()
+    val anyValue = AnyValue.fromAny(value)
+    val anyValue2 = AnyValue.fromAny(value2)
+    val anyValue3 = AnyValue.fromAny(value3)
+    val key =
+      connector.nullableAnyScalarInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = anyValue
+          this.value2 = anyValue2
+          this.value3 = anyValue3
+        }
+        .data
+        .key1
+
+    val queryResult =
+      connector.nullableAnyScalarGetAllByTagAndValue.execute {
+        this.value = anyValue
+        this.tag = tag
+      }
+    queryResult.data shouldBe
+      NullableAnyScalarGetAllByTagAndValueQuery.Data(
+        listOf(NullableAnyScalarGetAllByTagAndValueQuery.Data.ItemsItem(key.id))
       )
   }
 

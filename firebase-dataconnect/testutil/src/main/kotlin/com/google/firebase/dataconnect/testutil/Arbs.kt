@@ -32,10 +32,13 @@ import io.kotest.property.arbitrary.egyptianHieroglyphs
 import io.kotest.property.arbitrary.filter
 import io.kotest.property.arbitrary.filterNot
 import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.merge
 import io.kotest.property.arbitrary.next
 import io.kotest.property.arbitrary.of
 import io.kotest.property.arbitrary.string
+
+fun <A> Arb<A>.filterNotNull(): Arb<A & Any> = filter { it !== null }.map { it!! }
 
 fun Arb.Companion.keyedString(id: String, key: String, length: Int = 8): Arb<String> =
   arbitrary { rs ->
@@ -118,7 +121,12 @@ fun Arb.Companion.anyScalar(): Arb<Any?> =
     anyScalarArbs.allValues.bind()
   }
 
-fun Arb.Companion.anyScalarNotMatching(value: Any?) =
-  anyScalar().filter {
-    it != value && expectedAnyScalarRoundTripValue(it) != expectedAnyScalarRoundTripValue(value)
+fun <A> Arb<A>.filterNotAnyScalarMatching(value: Any?) = filter {
+  if (it == value) {
+    false
+  } else if (it === null || value === null) {
+    true
+  } else {
+    expectedAnyScalarRoundTripValue(it) != expectedAnyScalarRoundTripValue(value)
   }
+}

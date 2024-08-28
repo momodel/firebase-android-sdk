@@ -16,9 +16,12 @@
 
 package com.google.firebase.dataconnect.testutil
 
+@JvmName("expectedAnyScalarRoundTripValueOrNull")
 fun expectedAnyScalarRoundTripValue(value: Any?): Any? =
+  if (value === null) null else expectedAnyScalarRoundTripValue(value)
+
+fun expectedAnyScalarRoundTripValue(value: Any): Any =
   when (value) {
-    null -> null
     -0.0 -> 0.0
     Double.NaN -> "NaN"
     Double.POSITIVE_INFINITY -> "Infinity"

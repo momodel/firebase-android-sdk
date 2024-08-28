@@ -21,11 +21,20 @@ import com.google.firebase.dataconnect.util.nullProtoValue
 import com.google.firebase.dataconnect.util.toAny
 import com.google.firebase.dataconnect.util.toCompactString
 import com.google.firebase.dataconnect.util.toValueProto
+import com.google.protobuf.Struct
 import com.google.protobuf.Value
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.serializer
 
 public class AnyValue internal constructor(internal val protoValue: Value) {
+
+  init {
+    require(protoValue.kindCase != Value.KindCase.NULL_VALUE) {
+      "NULL_VALUE is not allowed; just use null"
+    }
+  }
+
+  internal constructor(struct: Struct) : this(struct.toValueProto())
 
   public constructor(value: Map<String, Any?>) : this(value.toValueProto())
 
@@ -39,8 +48,10 @@ public class AnyValue internal constructor(internal val protoValue: Value) {
 
   public constructor(@Suppress("UNUSED_PARAMETER") value: Nothing?) : this(nullProtoValue)
 
-  public val value: Any?
-    get() = protoValue.toAny()
+  public val value: Any
+    // NOTE: The not-null assertion operator (!!) below will never throw because the `init` block
+    // of this class asserts that `protoValue` is not NULL_VALUE.
+    get() = protoValue.toAny()!!
 
   override fun hashCode(): Int = value.hashCode()
 
@@ -51,14 +62,16 @@ public class AnyValue internal constructor(internal val protoValue: Value) {
   public companion object {
 
     public fun <T> from(value: T, serializer: SerializationStrategy<T>): AnyValue =
-      AnyValue(encodeToStruct(serializer, value).toValueProto())
+      AnyValue(encodeToStruct(serializer, value))
 
     public inline fun <reified T> fromSerializable(value: T): AnyValue = from(value, serializer())
 
-    public fun fromAny(value: Any?): AnyValue {
+    @JvmName("fromAnyOrNull")
+    public fun fromAny(value: Any?): AnyValue? = if (value === null) null else fromAny(value)
+
+    public fun fromAny(value: Any): AnyValue {
       @Suppress("UNCHECKED_CAST")
       return when (value) {
-        null -> AnyValue(value)
         is String -> AnyValue(value)
         is Boolean -> AnyValue(value)
         is Double -> AnyValue(value)
