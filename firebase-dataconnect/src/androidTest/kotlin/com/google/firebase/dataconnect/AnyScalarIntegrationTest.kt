@@ -83,12 +83,12 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   fun nonNullableAnyScalar_QueryVariableEdgeCases() = runTest {
     assertSoftly {
       for (value in EdgeCases.anyScalars.filterNotNull()) {
-        val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
+        val otherValues = Arb.anyScalarNotMatching(value).filter { it !== null }
         withClue("value=$value otherValues=$otherValues") {
           verifyAnyScalarQueryVariable(
             value,
-            otherValues[0],
-            otherValues[1],
+            otherValues.next(),
+            otherValues.next(),
             insert3MutationName = "NonNullableAnyScalarInsert3",
             getAllByTagAndValueQueryName = "NonNullableAnyScalarGetAllByTagAndValue"
           )
@@ -113,11 +113,11 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   fun nonNullableAnyScalar_QueryVariableNormalCases() = runTest {
     checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
       assume(value !== null)
-      val otherValues = List(2) { Arb.anyScalarNotMatching(value).filter { it !== null }.next() }
+      val otherValues = Arb.anyScalarNotMatching(value).filter { it !== null }
       verifyAnyScalarQueryVariable(
         value,
-        otherValues[0],
-        otherValues[1],
+        otherValues.next(),
+        otherValues.next(),
         insert3MutationName = "NonNullableAnyScalarInsert3",
         getAllByTagAndValueQueryName = "NonNullableAnyScalarGetAllByTagAndValue"
       )
@@ -168,12 +168,12 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   fun nullableAnyScalar_QueryVariableEdgeCases() = runTest {
     assertSoftly {
       for (value in EdgeCases.anyScalars) {
-        val otherValues = List(2) { Arb.anyScalarNotMatching(value).next() }
+        val otherValues = Arb.anyScalarNotMatching(value)
         withClue("value=$value otherValues=$otherValues") {
           verifyAnyScalarQueryVariable(
             value,
-            otherValues[0],
-            otherValues[1],
+            otherValues.next(),
+            otherValues.next(),
             insert3MutationName = "NullableAnyScalarInsert3",
             getAllByTagAndValueQueryName = "NullableAnyScalarGetAllByTagAndValue"
           )
@@ -196,11 +196,11 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nullableAnyScalar_QueryVariableNormalCases() = runTest {
     checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
-      val otherValues = List(2) { Arb.anyScalarNotMatching(value).next() }
+      val otherValues = Arb.anyScalarNotMatching(value)
       verifyAnyScalarQueryVariable(
         value,
-        otherValues[0],
-        otherValues[1],
+        otherValues.next(),
+        otherValues.next(),
         insert3MutationName = "NullableAnyScalarInsert3",
         getAllByTagAndValueQueryName = "NullableAnyScalarGetAllByTagAndValue"
       )
@@ -218,10 +218,16 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsMissing() = runTest {
     // TODO: factor this out to a reusable method
-    val values = List(3) { Arb.anyScalar().next() }
+    val values = Arb.anyScalar()
     val tag = UUID.randomUUID().toString()
     val keys =
-      executeInsert3Mutation("NullableAnyScalarInsert3", tag, values[0], values[1], values[2])
+      executeInsert3Mutation(
+        "NullableAnyScalarInsert3",
+        tag,
+        values.next(),
+        values.next(),
+        values.next()
+      )
 
     val queryRef =
       dataConnect.query(
@@ -256,9 +262,10 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   @Test
   fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsNull() = runTest {
     // TODO: factor this out to a reusable method
-    val values = List(2) { Arb.anyScalar().filter { it !== null }.next() }
+    val values = Arb.anyScalar().filter { it !== null }
     val tag = UUID.randomUUID().toString()
-    val keys = executeInsert3Mutation("NullableAnyScalarInsert3", tag, null, values[0], values[1])
+    val keys =
+      executeInsert3Mutation("NullableAnyScalarInsert3", tag, null, values.next(), values.next())
 
     val queryRef =
       dataConnect.query(
