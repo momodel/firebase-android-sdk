@@ -125,23 +125,23 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Test
-  fun nonNullableAnyScalar_MutationVariableFailsIfMissing() = runTest {
+  fun nonNullableAnyScalar_MutationFailsIfAnyVariableIsMissing() = runTest {
     verifyMutationWithMissingAnyVariableFails("NonNullableAnyScalarInsert")
   }
 
   @Test
-  fun nonNullableAnyScalar_QueryVariableFailsIfMissing() = runTest {
+  fun nonNullableAnyScalar_QueryFailsIfAnyVariableIsMissing() = runTest {
     verifyQueryWithMissingAnyVariableFails("NonNullableAnyScalarGetAllByTagAndValue")
   }
 
   @Test
-  fun nonNullableAnyScalar_MutationVariableFailsIfNull() = runTest {
-    verifyMutationWithNullVariableValueFails("NonNullableAnyScalarInsert")
+  fun nonNullableAnyScalar_MutationFailsIfAnyVariableIsNull() = runTest {
+    verifyMutationWithNullAnyVariableFails("NonNullableAnyScalarInsert")
   }
 
   @Test
-  fun nonNullableAnyScalar_QueryVariableFailsIfNull() = runTest {
-    verifyQueryWithNullVariableValueFails("NonNullableAnyScalarGetAllByTagAndValue")
+  fun nonNullableAnyScalar_QueryFailsIfAnyVariableIsNull() = runTest {
+    verifyQueryWithNullAnyVariableFails("NonNullableAnyScalarGetAllByTagAndValue")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,21 +208,23 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Test
-  fun nullableAnyScalar_MutationVariableSucceedsIfMissing() = runTest {
-    val key = executeInsertMutation("InsertIntoNullableAnyScalar", EmptyVariables)
-    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
+  fun nullableAnyScalar_MutationSucceedsIfAnyVariableIsMissing() = runTest {
+    verifyMutationWithMissingAnyVariableSucceeds(
+      insertMutationName = "NullableAnyScalarInsert",
+      getByKeyQueryName = "NullableAnyScalarGetByKey",
+    )
   }
 
   @Test
-  fun nullableAnyScalar_QueryVariableSucceedsIfMissing() = runTest {
+  fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsMissing() = runTest {
     // TODO: factor this out to a reuable method
     val value = Arb.anyScalar().next()
-    val key = executeInsertMutation("InsertIntoNullableAnyScalar", value)
+    val key = executeInsertMutation("NullableAnyScalarInsert", value)
     val id = UUIDSerializer.serialize(key.id)
 
     val queryRef =
       dataConnect.query(
-        operationName = "GetFromNullableAnyScalarByIdAndValue",
+        operationName = "NullableAnyScalarGetAllByTagAndValue",
         variables = IdQueryVariables(key.id),
         DataConnectUntypedData,
         serializer(),
@@ -239,21 +241,23 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Test
-  fun nullableAnyScalar_MutationVariableSucceedsIfNull() = runTest {
-    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
-    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
+  fun nullableAnyScalar_MutationSucceedsIfAnyVariableIsNull() = runTest {
+    verifyMutationWithNullAnyVariableSucceeds(
+      insertMutationName = "NullableAnyScalarInsert",
+      getByKeyQueryName = "NullableAnyScalarGetByKey",
+    )
   }
 
   @Test
-  fun nullableAnyScalar_QueryVariableSucceedsIfNull() = runTest {
+  fun nullableAnyScalar_QuerySucceedsIfAnyVariableIsNull() = runTest {
     // TODO: factor this out to a reuable method
-    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
+    val key = executeInsertMutation("NullableAnyScalarInsert", null)
     val id = UUIDSerializer.serialize(key.id)
 
     val queryVariables = DataConnectUntypedVariables("id" to id, "value" to null)
     val queryRef =
       dataConnect.query(
-        operationName = "GetFromNullableAnyScalarByIdAndValue",
+        operationName = "NullableAnyScalarGetAllByTagAndValue",
         variables = queryVariables,
         DataConnectUntypedData,
         DataConnectUntypedVariables,
@@ -347,7 +351,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun mutationNullValueForNonNullableListOfNullableAnyVariableShouldFail() = runTest {
-    verifyMutationWithNullVariableValueFails("InsertIntoAnyScalarNonNullableListOfNullable")
+    verifyMutationWithNullAnyVariableFails("InsertIntoAnyScalarNonNullableListOfNullable")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -439,7 +443,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   @Test
   fun mutationNullForNonNullableListOfNonNullableAnyVariableShouldFail() = runTest {
-    verifyMutationWithNullVariableValueFails("InsertIntoAnyScalarNonNullableListOfNonNullable")
+    verifyMutationWithNullAnyVariableFails("InsertIntoAnyScalarNonNullableListOfNonNullable")
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -552,14 +556,22 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   ): QueryRef<Data, DataConnectUntypedVariables> =
     queryRefForVariables(operationName, mapOf("value" to variable), dataDeserializer)
 
-  private suspend fun verifyMutationWithNullVariableValueFails(operationName: String) {
+  private suspend fun verifyMutationWithNullAnyVariableFails(operationName: String) {
     val mutationRef = mutationRefForVariable(operationName, null, DataConnectUntypedData)
     mutationRef.verifyExecuteFailsDueToNullVariable()
   }
 
-  private suspend fun verifyQueryWithNullVariableValueFails(operationName: String) {
+  private suspend fun verifyQueryWithNullAnyVariableFails(operationName: String) {
     val queryRef = queryRefForVariable(operationName, null, DataConnectUntypedData)
     queryRef.verifyExecuteFailsDueToNullVariable()
+  }
+
+  private suspend fun verifyMutationWithNullAnyVariableSucceeds(
+    insertMutationName: String,
+    getByKeyQueryName: String,
+  ) {
+    val key = executeInsertMutation(insertMutationName, null)
+    verifyQueryResult2(getByKeyQueryName, key, null)
   }
 
   private suspend fun OperationRef<DataConnectUntypedData, *>
@@ -582,6 +594,14 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
     val variables: Map<String, Any?> = emptyMap()
     val queryRef = queryRefForVariables(operationName, variables, DataConnectUntypedData)
     queryRef.verifyExecuteFailsDueToMissingVariable()
+  }
+
+  private suspend fun verifyMutationWithMissingAnyVariableSucceeds(
+    insertMutationName: String,
+    getByKeyQueryName: String,
+  ) {
+    val key = executeInsertMutation(insertMutationName, EmptyVariables)
+    verifyQueryResult2(getByKeyQueryName, key, null)
   }
 
   private suspend fun OperationRef<DataConnectUntypedData, *>

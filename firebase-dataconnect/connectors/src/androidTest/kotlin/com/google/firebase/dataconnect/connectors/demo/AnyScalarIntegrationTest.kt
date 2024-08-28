@@ -91,22 +91,22 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
   }
 
   @Test
-  fun nonNullableAnyScalar_MutationVariableFailsIfMissing() = runTest {
+  fun nonNullableAnyScalar_MutationFailsIfAnyVariableIsMissing() = runTest {
     connector.nonNullableAnyScalarInsert.verifyFailsWithMissingVariableValue()
   }
 
   @Test
-  fun nonNullableAnyScalar_QueryVariableFailsIfMissing() = runTest {
+  fun nonNullableAnyScalar_QueryFailsIfAnyVariableIsMissing() = runTest {
     connector.nonNullableAnyScalarGetAllByTagAndValue.verifyFailsWithMissingVariableValue()
   }
 
   @Test
-  fun nonNullableAnyScalar_MutationVariableFailsIfNull() = runTest {
+  fun nonNullableAnyScalar_MutationFailsIfAnyVariableIsNull() = runTest {
     connector.nonNullableAnyScalarInsert.verifyFailsWithNullVariableValue()
   }
 
   @Test
-  fun nonNullableAnyScalar_QueryVariableFailsIfNull() = runTest {
+  fun nonNullableAnyScalar_QueryFailsIfAnyVariableIsNull() = runTest {
     connector.nonNullableAnyScalarGetAllByTagAndValue.verifyFailsWithNullVariableValue()
   }
 

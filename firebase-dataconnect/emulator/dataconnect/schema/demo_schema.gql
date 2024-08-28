@@ -309,7 +309,7 @@ type NonNullableAnyScalar @table {
 
 type NullableAnyScalar @table {
   value: Any
-  cookie: String
+  tag: String
 }
 
 type AnyScalarNullableListNullable @table {
