@@ -302,19 +302,19 @@ type NullableTimestampsWithDefaults @table {
   requestTime2: Timestamp @default(expr: "request.time")
 }
 
-type AnyScalarNonNullable @table {
+type AnyScalarNonNullable @table @index(fields: ["tag"]) {
   value: Any!
   tag: String
   position: Int
 }
 
-type AnyScalarNullable @table {
+type AnyScalarNullable @table @index(fields: ["tag"]) {
   value: Any
   tag: String
   position: Int
 }
 
-type AnyScalarNullableListOfNullable @table {
+type AnyScalarNullableListOfNullable @table @index(fields: ["tag"]) {
   value: [Any]
   tag: String
   position: Int
