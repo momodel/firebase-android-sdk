@@ -157,8 +157,6 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
   // type AnyScalarNullable @table { value: Any, tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
-  @Test fun foo() = runTest(timeout = Duration.INFINITE) { verifyAnyScalarNullableRoundTrip(null) }
-
   @Test
   fun anyScalarNullable_MutationVariableEdgeCases() = runTest {
     assertSoftly {
