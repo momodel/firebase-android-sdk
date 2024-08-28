@@ -146,21 +146,18 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type NullableAnyScalar @table { value: Any }
-  // mutation InsertIntoNullableAnyScalar($value: Any) { key: ... }
-  // query GetFromNullableAnyScalarByKey($key: NullableAnyScalar_Key!) { item: ... }
-  // query GetFromNullableAnyScalarByIdAndValue($id: UUID!, $value: Any) { items: ... }
+  // type NullableAnyScalar @table { value: Any, tag: String }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
-  fun nullableAnyScalarEdgeCasesRoundTrip() = runTest {
+  fun nullableAnyScalar_MutationVariableEdgeCases() = runTest {
     assertSoftly {
       for (value in EdgeCases.anyScalars) {
         withClue("value=$value") {
           verifyAnyScalarRoundTrip(
             value,
-            insertMutationName = "InsertIntoNullableAnyScalar",
-            getByKeyQueryName = "GetFromNullableAnyScalarByKey",
+            insertMutationName = "NullableAnyScalarInsert",
+            getByKeyQueryName = "NullableAnyScalarGetByKey",
           )
         }
       }
@@ -168,30 +165,56 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Test
-  fun nullableAnyScalarNormalCasesRoundTrip() = runTest {
+  fun nullableAnyScalar_QueryVariableEdgeCases() = runTest {
+    assertSoftly {
+      for (value in EdgeCases.anyScalars) {
+        val otherValues = List(2) { Arb.anyScalarNotMatching(value).next() }
+        withClue("value=$value otherValues=$otherValues") {
+          verifyAnyScalarQueryVariable(
+            value,
+            otherValues[0],
+            otherValues[1],
+            insert3MutationName = "NullableAnyScalarInsert3",
+            getAllByTagAndValueQueryName = "NullableAnyScalarGetAllByTagAndValue"
+          )
+        }
+      }
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_MutationVariableNormalCases() = runTest {
     checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
       verifyAnyScalarRoundTrip(
         value,
-        insertMutationName = "InsertIntoNullableAnyScalar",
-        getByKeyQueryName = "GetFromNullableAnyScalarByKey",
+        insertMutationName = "NullableAnyScalarInsert",
+        getByKeyQueryName = "NullableAnyScalarGetByKey",
       )
     }
   }
 
   @Test
-  fun mutationMissingNullableAnyVariableShouldUseNull() = runTest {
+  fun nullableAnyScalar_QueryVariableNormalCases() = runTest {
+    checkAll(normalCasePropTestConfig, Arb.anyScalar()) { value ->
+      val otherValues = List(2) { Arb.anyScalarNotMatching(value).next() }
+      verifyAnyScalarQueryVariable(
+        value,
+        otherValues[0],
+        otherValues[1],
+        insert3MutationName = "NullableAnyScalarInsert3",
+        getAllByTagAndValueQueryName = "NullableAnyScalarGetAllByTagAndValue"
+      )
+    }
+  }
+
+  @Test
+  fun nullableAnyScalar_MutationVariableSucceedsIfMissing() = runTest {
     val key = executeInsertMutation("InsertIntoNullableAnyScalar", EmptyVariables)
     verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
   }
 
   @Test
-  fun mutationNullForNullableAnyVariableShouldBeSetToNull() = runTest {
-    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
-    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
-  }
-
-  @Test
-  fun queryMissingNullableAnyVariableShouldSucceed() = runTest {
+  fun nullableAnyScalar_QueryVariableSucceedsIfMissing() = runTest {
     // TODO: factor this out to a reuable method
     val value = Arb.anyScalar().next()
     val key = executeInsertMutation("InsertIntoNullableAnyScalar", value)
@@ -216,7 +239,13 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
   }
 
   @Test
-  fun queryNullValueForNullableAnyVariableShouldSucceed() = runTest {
+  fun nullableAnyScalar_MutationVariableSucceedsIfNull() = runTest {
+    val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
+    verifyQueryResult2("GetFromNullableAnyScalarByKey", key, null)
+  }
+
+  @Test
+  fun nullableAnyScalar_QueryVariableSucceedsIfNull() = runTest {
     // TODO: factor this out to a reuable method
     val key = executeInsertMutation("InsertIntoNullableAnyScalar", null)
     val id = UUIDSerializer.serialize(key.id)
