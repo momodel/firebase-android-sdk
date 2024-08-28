@@ -1259,25 +1259,25 @@ query GetNullableTimestampsWithDefaultsByKey($key: NullableTimestampsWithDefault
 }
 
 ###############################################################################
-# Operations for table: NonNullableAnyScalar
+# Operations for table: AnyScalarNonNullable
 ###############################################################################
 
-mutation NonNullableAnyScalarInsert($tag: String, $value: Any!) @auth(level: PUBLIC) {
-  key: nonNullableAnyScalar_insert(data: { tag: $tag, value: $value })
+mutation AnyScalarNonNullableInsert($tag: String, $value: Any!) @auth(level: PUBLIC) {
+  key: anyScalarNonNullable_insert(data: { tag: $tag, value: $value })
 }
 
-mutation NonNullableAnyScalarInsert3($tag: String, $value1: Any!, $value2: Any!, $value3: Any!) @auth(level: PUBLIC) {
-  key1: nonNullableAnyScalar_insert(data: { value: $value1, tag: $tag, position: 1 })
-  key2: nonNullableAnyScalar_insert(data: { value: $value2, tag: $tag, position: 2 })
-  key3: nonNullableAnyScalar_insert(data: { value: $value3, tag: $tag, position: 3 })
+mutation AnyScalarNonNullableInsert3($tag: String, $value1: Any!, $value2: Any!, $value3: Any!) @auth(level: PUBLIC) {
+  key1: anyScalarNonNullable_insert(data: { value: $value1, tag: $tag, position: 1 })
+  key2: anyScalarNonNullable_insert(data: { value: $value2, tag: $tag, position: 2 })
+  key3: anyScalarNonNullable_insert(data: { value: $value3, tag: $tag, position: 3 })
 }
 
-query NonNullableAnyScalarGetByKey($key: NonNullableAnyScalar_Key!) @auth(level: PUBLIC) {
-  item: nonNullableAnyScalar(key: $key) { value }
+query AnyScalarNonNullableGetByKey($key: AnyScalarNonNullable_Key!) @auth(level: PUBLIC) {
+  item: anyScalarNonNullable(key: $key) { value }
 }
 
-query NonNullableAnyScalarGetAllByTagAndValue($tag: String, $value: Any!) @auth(level: PUBLIC) {
-  items: nonNullableAnyScalars(
+query AnyScalarNonNullableGetAllByTagAndValue($tag: String, $value: Any!) @auth(level: PUBLIC) {
+  items: anyScalarNonNullables(
     limit: 5,
     orderBy: { position: ASC },
     where: { value: { eq: $value }, tag: { eq: $tag } },
@@ -1285,25 +1285,25 @@ query NonNullableAnyScalarGetAllByTagAndValue($tag: String, $value: Any!) @auth(
 }
 
 ###############################################################################
-# Operations for table: NullableAnyScalar
+# Operations for table: AnyScalarNullable
 ###############################################################################
 
-mutation NullableAnyScalarInsert($tag: String, $value: Any) @auth(level: PUBLIC) {
-  key: nullableAnyScalar_insert(data: { tag: $tag, value: $value })
+mutation AnyScalarNullableInsert($tag: String, $value: Any) @auth(level: PUBLIC) {
+  key: anyScalarNullable_insert(data: { tag: $tag, value: $value })
 }
 
-mutation NullableAnyScalarInsert3($tag: String, $value1: Any, $value2: Any, $value3: Any) @auth(level: PUBLIC) {
-  key1: nullableAnyScalar_insert(data: { value: $value1, tag: $tag, position: 1 })
-  key2: nullableAnyScalar_insert(data: { value: $value2, tag: $tag, position: 2 })
-  key3: nullableAnyScalar_insert(data: { value: $value3, tag: $tag, position: 3 })
+mutation AnyScalarNullableInsert3($tag: String, $value1: Any, $value2: Any, $value3: Any) @auth(level: PUBLIC) {
+  key1: anyScalarNullable_insert(data: { value: $value1, tag: $tag, position: 1 })
+  key2: anyScalarNullable_insert(data: { value: $value2, tag: $tag, position: 2 })
+  key3: anyScalarNullable_insert(data: { value: $value3, tag: $tag, position: 3 })
 }
 
-query NullableAnyScalarGetByKey($key: NullableAnyScalar_Key!) @auth(level: PUBLIC) {
-  item: nullableAnyScalar(key: $key) { value }
+query AnyScalarNullableGetByKey($key: AnyScalarNullable_Key!) @auth(level: PUBLIC) {
+  item: anyScalarNullable(key: $key) { value }
 }
 
-query NullableAnyScalarGetAllByTagAndValue($tag: String, $value: Any) @auth(level: PUBLIC) {
-  items: nullableAnyScalars(
+query AnyScalarNullableGetAllByTagAndValue($tag: String, $value: Any) @auth(level: PUBLIC) {
+  items: anyScalarNullables(
     limit: 5,
     orderBy: { position: ASC },
     where: { value: { eq: $value }, tag: { eq: $tag } },
@@ -1313,12 +1313,12 @@ query NullableAnyScalarGetAllByTagAndValue($tag: String, $value: Any) @auth(leve
 
 
 
-mutation InsertIntoAnyScalarNullableListNullable($value: [Any!]) @auth(level: PUBLIC) {
-  key: anyScalarNullableListNullable_insert(data: { value: $value })
+mutation InsertIntoAnyScalarNullableListOfNullable($value: [Any!]) @auth(level: PUBLIC) {
+  key: anyScalarNullableListOfNullable_insert(data: { value: $value })
 }
 
-query GetFromAnyScalarNullableListNullableById($id: UUID!) @auth(level: PUBLIC) {
-  item: anyScalarNullableListNullable(id: $id) { value }
+query GetFromAnyScalarNullableListOfNullableById($id: UUID!) @auth(level: PUBLIC) {
+  item: anyScalarNullableListOfNullable(id: $id) { value }
 }
 
 mutation InsertIntoAnyScalarNonNullableListOfNullable($value: [Any!]!) @auth(level: PUBLIC) {
