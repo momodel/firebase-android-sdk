@@ -320,9 +320,8 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
   @Test
   fun anyScalarNullableListOfNullable_MutationVariableEdgeCases() = runTest {
     assertSoftly {
-      withClue("value=null") { verifyAnyScalarNullableListOfNullableRoundTrip(null) }
-      val values = EdgeCases.anyScalars.filterIsInstance<List<Any?>>().map { it.filterNotNull() }
-      for (value in values) {
+      val edgeCases = EdgeCases.anyScalars.filterIsInstance<List<Any?>>().map { it.filterNotNull() }
+      for (value in edgeCases) {
         withClue("value=$value") { verifyAnyScalarNullableListOfNullableRoundTrip(value) }
       }
     }
@@ -350,6 +349,35 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
           )
         }
       }
+    }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_MutationVariableNormalCases() = runTest {
+    val values = Arb.anyScalar().filterIsInstance<Any?, List<Any?>>().map { it.filterNotNull() }
+    checkAll(normalCasePropTestConfig, values) { value ->
+      verifyAnyScalarNullableListOfNullableRoundTrip(value)
+    }
+  }
+
+  @Test
+  fun anyScalarNullableListOfNullable_QueryVariableNormalCases() = runTest {
+    val values =
+      Arb.anyScalar()
+        .filterIsInstance<Any?, List<Any?>>()
+        .map { it.filterNotNull() }
+        .filter { it.isNotEmpty() }
+    val otherValues =
+      Arb.anyScalar().filterIsInstance<Any?, List<Any?>>().map { it.filterNotNull() }
+
+    checkAll(normalCasePropTestConfig, values) { value ->
+      val curOtherValues =
+        otherValues.filterNotIncludesAllMatchingAnyScalars(value).orNull(nullProbability = 0.1)
+      verifyAnyScalarNullableListOfNullableQueryVariable(
+        value,
+        curOtherValues.next(),
+        curOtherValues.next()
+      )
     }
   }
 
