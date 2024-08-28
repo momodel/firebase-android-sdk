@@ -61,7 +61,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type AnyScalarNonNullable @table { value: Any!, tag: String }
+  // type AnyScalarNonNullable @table { value: Any!, tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
@@ -144,7 +144,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type AnyScalarNullable @table { value: Any, tag: String }
+  // type AnyScalarNullable @table { value: Any, tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
@@ -281,9 +281,7 @@ class AnyScalarIntegrationTest : DataConnectIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type AnyScalarNullableListOfNullable @table { value: [Any] }
-  // mutation InsertIntoAnyScalarNullableListOfNullable($value: [Any!]) { key: ... }
-  // query GetFromAnyScalarNullableListOfNullableById($id: UUID!) { item: ... }
+  // type AnyScalarNullableListOfNullable @table { value: [Any], tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test

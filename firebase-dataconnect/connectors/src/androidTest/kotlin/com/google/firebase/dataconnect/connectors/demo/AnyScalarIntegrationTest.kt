@@ -53,7 +53,7 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type AnyScalarNonNullable @table { value: Any!, tag: String }
+  // type AnyScalarNonNullable @table { value: Any!, tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test
@@ -154,7 +154,7 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
   // Tests for inserting into and querying this table:
-  // type AnyScalarNullable @table { value: Any, tag: String }
+  // type AnyScalarNullable @table { value: Any, tag: String, position: Int }
   //////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Test fun foo() = runTest(timeout = Duration.INFINITE) { verifyAnyScalarNullableRoundTrip(null) }
