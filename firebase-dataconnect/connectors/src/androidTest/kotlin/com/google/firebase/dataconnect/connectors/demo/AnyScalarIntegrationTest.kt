@@ -26,6 +26,7 @@ import com.google.firebase.dataconnect.testutil.EdgeCases
 import com.google.firebase.dataconnect.testutil.anyScalar
 import com.google.firebase.dataconnect.testutil.expectedAnyScalarRoundTripValue
 import com.google.firebase.dataconnect.testutil.filterNotAnyScalarMatching
+import com.google.firebase.dataconnect.testutil.filterNotIncludesAllMatchingAnyScalars
 import com.google.firebase.dataconnect.testutil.filterNotNull
 import io.kotest.assertions.asClue
 import io.kotest.assertions.assertSoftly
@@ -39,8 +40,10 @@ import io.kotest.property.Arb
 import io.kotest.property.EdgeConfig
 import io.kotest.property.PropTestConfig
 import io.kotest.property.arbitrary.filter
+import io.kotest.property.arbitrary.filterIsInstance
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.next
+import io.kotest.property.arbitrary.orNull
 import io.kotest.property.checkAll
 import java.util.UUID
 import kotlinx.coroutines.test.runTest
@@ -325,6 +328,31 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     }
   }
 
+  @Test
+  fun anyScalarNullableListOfNullable_QueryVariableEdgeCases() = runTest {
+    val edgeCases =
+      EdgeCases.anyScalars
+        .filterIsInstance<List<Any?>>()
+        .map { it.filterNotNull() }
+        .filter { it.isNotEmpty() }
+    val otherValues =
+      Arb.anyScalar().filterIsInstance<Any?, List<Any?>>().map { it.filterNotNull() }
+
+    assertSoftly {
+      for (value in edgeCases) {
+        val curOtherValues =
+          otherValues.filterNotIncludesAllMatchingAnyScalars(value).orNull(nullProbability = 0.1)
+        withClue("value=$value") {
+          verifyAnyScalarNullableListOfNullableQueryVariable(
+            value,
+            curOtherValues.next(),
+            curOtherValues.next()
+          )
+        }
+      }
+    }
+  }
+
   private suspend fun verifyAnyScalarNullableListOfNullableRoundTrip(value: List<Any>?) {
     val anyValue = value?.map { AnyValue.fromAny(it) }
     val expectedQueryResult = value?.map { AnyValue.fromAny(expectedAnyScalarRoundTripValue(it)) }
@@ -335,6 +363,41 @@ class AnyScalarIntegrationTest : DemoConnectorIntegrationTestBase() {
     queryResult.data shouldBe
       AnyScalarNullableListOfNullableGetByKeyQuery.Data(
         AnyScalarNullableListOfNullableGetByKeyQuery.Data.Item(expectedQueryResult)
+      )
+  }
+
+  private suspend fun verifyAnyScalarNullableListOfNullableQueryVariable(
+    value: List<Any>?,
+    value2: List<Any>?,
+    value3: List<Any>?,
+  ) {
+    require(value != value2)
+    require(value != value3)
+    // TODO: implement a check to ensure that value is not a subset of value2 and value3.
+
+    val tag = UUID.randomUUID().toString()
+    val anyValue = value?.map(AnyValue::fromAny)
+    val anyValue2 = value2?.map(AnyValue::fromAny)
+    val anyValue3 = value3?.map(AnyValue::fromAny)
+    val key =
+      connector.anyScalarNullableListOfNullableInsert3
+        .execute {
+          this.tag = tag
+          this.value1 = anyValue
+          this.value2 = anyValue2
+          this.value3 = anyValue3
+        }
+        .data
+        .key1
+
+    val queryResult =
+      connector.anyScalarNullableListOfNullableGetAllByTagAndValue.execute {
+        this.value = anyValue
+        this.tag = tag
+      }
+    queryResult.data shouldBe
+      AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data(
+        listOf(AnyScalarNullableListOfNullableGetAllByTagAndValueQuery.Data.ItemsItem(key.id))
       )
   }
 

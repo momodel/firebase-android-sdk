@@ -130,3 +130,19 @@ fun <A> Arb<A>.filterNotAnyScalarMatching(value: Any?) = filter {
     expectedAnyScalarRoundTripValue(it) != expectedAnyScalarRoundTripValue(value)
   }
 }
+
+fun <A> Arb<List<A>>.filterNotIncludesAllMatchingAnyScalars(values: List<Any?>) = filter {
+  require(values.isNotEmpty()) { "values must not be empty" }
+
+  val allValues = buildList {
+    for (value in it) {
+      add(value)
+      add(expectedAnyScalarRoundTripValue(value))
+    }
+  }
+
+  !values
+    .map { Pair(it, expectedAnyScalarRoundTripValue(it)) }
+    .map { allValues.contains(it.first) || allValues.contains(it.second) }
+    .reduce { acc, contained -> acc && contained }
+}
